@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "deploy:site": "npm run build && rsync -av --delete dist/ ../figarist.github.io/bouncy/",
     "preview": "vite preview",
     "test": "vitest run"
   },
