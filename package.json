@@ -1,0 +1,18 @@
+{
+  "name": "tyhyi-klas",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@fontsource/nunito": "^5.1.0",
+    "@fontsource/rubik": "^5.1.0",
+    "vite": "^6.1.0",
+    "vitest": "^3.0.5"
+  }
+}
