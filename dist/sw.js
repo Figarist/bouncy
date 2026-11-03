@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tyhyi-klas-v6';
+const CACHE_NAME = 'tyhyi-klas-v7';
 const CORE_ASSETS = ['./', './index.html', './manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {
