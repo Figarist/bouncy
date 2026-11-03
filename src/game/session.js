@@ -37,6 +37,11 @@ export class SessionManager {
     this.timerRunning = false;
   }
 
+  cancelTimer() {
+    this.timerRunning = false;
+    this.timerRemainingSeconds = 0;
+  }
+
   toggleTimer() {
     if (this.timerRemainingSeconds > 0) {
       this.timerRunning = !this.timerRunning;

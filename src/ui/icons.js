@@ -359,3 +359,88 @@ export function iconVolume() {
     <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
   </svg>`;
 }
+
+export function iconTimer() {
+  return `<svg class="ui-icon icon-timer" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="13" r="8"></circle>
+    <polyline points="12 9 12 13 14.5 15"></polyline>
+    <line x1="9" y1="2" x2="15" y2="2"></line>
+  </svg>`;
+}
+
+export function iconChevron(direction = 'right') {
+  const points = {
+    right: '9 6 15 12 9 18',
+    left: '15 6 9 12 15 18',
+    down: '6 9 12 15 18 9',
+  }[direction] || '9 6 15 12 9 18';
+  return `<svg class="ui-icon icon-chevron" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="${points}"></polyline>
+  </svg>`;
+}
+
+export function iconEdit() {
+  return `<svg class="ui-icon icon-edit" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 20h9"></path>
+    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"></path>
+  </svg>`;
+}
+
+export function iconPalette() {
+  return `<svg class="ui-icon icon-palette" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 2a10 10 0 1 0 0 20c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.4A5.6 5.6 0 0 0 22 9.8C22 5.5 17.5 2 12 2z"></path>
+    <circle cx="7.5" cy="10.5" r="1.3" fill="currentColor"></circle>
+    <circle cx="12" cy="7" r="1.3" fill="currentColor"></circle>
+    <circle cx="16.5" cy="10.5" r="1.3" fill="currentColor"></circle>
+  </svg>`;
+}
+
+export function iconBell() {
+  return `<svg class="ui-icon icon-bell" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path>
+    <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+  </svg>`;
+}
+
+export function iconSun() {
+  return `<svg class="ui-icon icon-sun" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="4"></circle>
+    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"></path>
+  </svg>`;
+}
+
+export function iconHelp() {
+  return `<svg class="ui-icon icon-help" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="10"></circle>
+    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+  </svg>`;
+}
+
+export function iconTrophy() {
+  return `<svg class="ui-icon icon-trophy" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M8 21h8M12 17v4"></path>
+    <path d="M7 4h10v5a5 5 0 0 1-10 0z"></path>
+    <path d="M17 6h3a3 3 0 0 1-3 4M7 6H4a3 3 0 0 0 3 4"></path>
+  </svg>`;
+}
+
+export function iconGrip() {
+  return `<svg class="ui-icon icon-grip" viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+    <circle cx="9" cy="6" r="1.6"></circle><circle cx="15" cy="6" r="1.6"></circle>
+    <circle cx="9" cy="12" r="1.6"></circle><circle cx="15" cy="12" r="1.6"></circle>
+    <circle cx="9" cy="18" r="1.6"></circle><circle cx="15" cy="18" r="1.6"></circle>
+  </svg>`;
+}
+
+/** Leaderboard medal for places 1–3 (gold, silver, bronze). */
+export function iconMedal(place) {
+  const fill = { 1: '#FFD43B', 2: '#CBD5E1', 3: '#E8955A' }[place] || '#CBD5E1';
+  const ink = { 1: '#7A4A00', 2: '#334155', 3: '#5C2A0A' }[place] || '#334155';
+  return `<svg class="ui-icon icon-medal" viewBox="0 0 24 24" width="22" height="22">
+    <path d="M7 2h4l2 6H9z" fill="#3B82F6"></path>
+    <path d="M17 2h-4l-2 6h4z" fill="#EF4444"></path>
+    <circle cx="12" cy="15" r="7" fill="${fill}" stroke="${ink}" stroke-opacity="0.35" stroke-width="1.2"></circle>
+    <text x="12" y="18.6" text-anchor="middle" font-size="10" font-weight="800" font-family="Rubik, sans-serif" fill="${ink}">${place}</text>
+  </svg>`;
+}
