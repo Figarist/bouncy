@@ -6,7 +6,7 @@ import { sfx } from './audio/sfx.js';
 import { ZoneStateMachine } from './game/zones.js';
 import { StarManager } from './game/stars.js';
 import { SessionManager } from './game/session.js';
-import { StorageManager } from './game/storage.js';
+import { StorageManager, createClassRecord } from './game/storage.js';
 import { PhysicsWorld } from './world/physics.js';
 import { CanvasRenderer } from './render/renderer.js';
 import { HUD } from './ui/hud.js';
@@ -34,7 +34,7 @@ class GameApp {
     this.session = new SessionManager({ initialMode: modeCfg.id });
 
     const activeClass = this.state.activeClass;
-    const classData = this.state.classes[activeClass] || { stars: 0, goal: 20, reward: '5 хв мультика' };
+    const classData = this.state.classes[activeClass] || createClassRecord();
 
     this.stars = new StarManager({
       secondsPerStar: CONFIG.stars.secondsPerStar,
@@ -52,13 +52,18 @@ class GameApp {
     });
 
     // UI
-    this.hud = new HUD({
-      onModeChange: (modeId) => this.switchMode(modeId),
-      onQuickCalibrate: () => this.calibrateMic(),
-      onPanelToggle: () => this.panel.toggle(),
-      onTimerToggle: () => this.session.toggleTimer(),
-      onResetWeek: () => this.resetWeekStars(),
-    });
+    this.hud = new HUD(
+      {
+        onModeChange: (modeId) => this.switchMode(modeId),
+        onClassChange: (className) => this.switchClass(className),
+        onQuickCalibrate: () => this.calibrateMic(),
+        onPanelToggle: () => this.panel.toggle(),
+        onTimerToggle: () => this.session.toggleTimer(),
+        onResetGoal: () => this.resetCurrentStars(),
+      },
+      this.state.classes,
+      this.state.activeClass
+    );
 
     this.panel = new TeacherPanel(this.state, this.getPanelCallbacks());
 
@@ -72,6 +77,7 @@ class GameApp {
     // State
     this.lastFrameTime = performance.now();
     this.lastAlertTime = 0;
+    this.quietStatSaveTimer = 0;
     this.isPaused = false;
     this.wasCalibrating = false;
     this.cursorTimer = null;
@@ -108,6 +114,21 @@ class GameApp {
       this.hud.showMicBlockedHelp();
     }
     return listening;
+  }
+
+  switchClass(className) {
+    if (!this.state.classes[className]) return;
+    this.state.activeClass = className;
+    const cData = this.state.classes[className];
+    this.stars.stars = cData.stars;
+    this.stars.goal = cData.goal;
+    this.stars.resetProgress();
+    this.displayedStars = cData.stars;
+    this.hasCelebratedGoal = cData.stars >= cData.goal;
+    this.saveState();
+    this.hud.renderClassSwitcher(this.state.classes, className);
+    this.hud.updateStars(this.displayedStars, this.stars.goal, 0, false, cData.reward);
+    this.panel.refreshClassList();
   }
 
   getPanelCallbacks() {
@@ -152,14 +173,29 @@ class GameApp {
         this.renderer.setTheme(theme);
         this.saveState();
       },
-      onSound: (sound) => {
+      onSound: (sound, preview = false) => {
         this.state.settings.alertSound = sound;
         this.saveState();
+        if (preview && sound !== 'none') {
+          sfx.playAlert(sound);
+        }
       },
-      onVolume: (vol) => {
+      onRepeatChange: (sec) => {
+        this.state.settings.alertRepeatSec = sec;
+        this.saveState();
+      },
+      onVolume: (vol, preview = false) => {
         this.state.settings.volume = vol;
         sfx.setVolume(vol);
         this.saveState();
+        if (preview && vol > 0) {
+          const sound = this.state.settings.alertSound;
+          if (sound && sound !== 'none') {
+            sfx.playAlert(sound);
+          } else {
+            sfx.playChime();
+          }
+        }
       },
       onLightRoom: (isLight) => {
         this.applyLightRoom(isLight);
@@ -173,34 +209,32 @@ class GameApp {
         this.panel.toggle(false);
       },
       onClassChange: (className) => {
-        this.state.activeClass = className;
-        const cData = this.state.classes[className] || { stars: 0, goal: 20, reward: '5 хв мультика' };
-        this.stars.stars = cData.stars;
-        this.stars.goal = cData.goal;
-        this.displayedStars = cData.stars;
-        this.hasCelebratedGoal = cData.stars >= cData.goal;
-        this.saveState();
-        this.hud.updateStars(this.displayedStars, this.stars.goal, 0, false, cData.reward);
+        this.switchClass(className);
       },
       onAddClass: (className) => {
         if (!this.state.classes[className]) {
-          this.state.classes[className] = {
-            stars: 0,
-            goal: 20,
-            reward: '5 хв мультика',
-            weekStart: new Date().toISOString().slice(0, 10),
-          };
+          this.state.classes[className] = createClassRecord();
         }
-        this.state.activeClass = className;
-        this.stars.stars = 0;
-        this.stars.goal = 20;
-        this.displayedStars = 0;
-        this.hasCelebratedGoal = false;
-        this.saveState();
-        this.hud.updateStars(0, 20, 0, false, '5 хв мультика');
+        this.switchClass(className);
       },
-      onResetWeek: () => {
-        this.resetWeekStars();
+      onDeleteClass: (className) => {
+        const keys = Object.keys(this.state.classes);
+        if (keys.length <= 1) return;
+        delete this.state.classes[className];
+        const nextClass = Object.keys(this.state.classes)[0];
+        this.switchClass(nextClass);
+      },
+      onAddTask: () => {
+        const cData = this.state.classes[this.state.activeClass];
+        if (cData) {
+          cData.tasksCompleted = (cData.tasksCompleted || 0) + 1;
+          sfx.playChime();
+          this.saveState();
+          this.hud.renderClassSwitcher(this.state.classes, this.state.activeClass);
+        }
+      },
+      onResetGoal: () => {
+        this.resetCurrentStars();
       },
       onAddStar: () => {
         this.awardStarWithFlight();
@@ -242,6 +276,10 @@ class GameApp {
 
   awardStarWithFlight() {
     this.stars.awardManualStar();
+    const cData = this.state.classes[this.state.activeClass];
+    if (cData) {
+      cData.totalStars = (cData.totalStars || 0) + 1;
+    }
     this.saveClassStars();
 
     const jarCoords = this.hud.getJarMouthCoords();
@@ -254,32 +292,37 @@ class GameApp {
         this.displayedStars = this.stars.stars;
         sfx.playChime();
         this.hud.triggerJarBounce();
-        this.checkWeeklyGoal();
+        this.checkGoalReached();
       }
     );
   }
 
-  resetWeekStars() {
+  resetCurrentStars() {
     const cData = this.state.classes[this.state.activeClass];
     if (cData) {
       cData.stars = 0;
-      cData.weekStart = new Date().toISOString().slice(0, 10);
     }
     this.stars.resetAll(cData?.goal || 20);
     this.displayedStars = 0;
     this.hasCelebratedGoal = false;
     this.saveState();
     this.hud.updateStars(0, this.stars.goal, 0, false, cData?.reward || 'Нагорода');
+    this.panel.updateClassStatsUI();
   }
 
-  checkWeeklyGoal() {
+  checkGoalReached() {
     const cData = this.state.classes[this.state.activeClass];
     if (this.stars.stars >= this.stars.goal && !this.hasCelebratedGoal) {
       this.hasCelebratedGoal = true;
+      if (cData) {
+        cData.goalsReached = (cData.goalsReached || 0) + 1;
+        this.saveState();
+        this.panel.updateClassStatsUI();
+      }
       sfx.playFanfare();
       this.renderer.particles.spawnConfetti(this.renderer.width, this.renderer.height);
       this.hud.showGoalReachedModal(cData?.reward || '5 хв мультика', () => {
-        this.resetWeekStars();
+        this.resetCurrentStars();
       });
     }
   }
@@ -464,6 +507,7 @@ class GameApp {
     if (cData) {
       cData.stars = this.stars.stars;
       this.saveState();
+      this.panel.updateClassStatsUI();
     }
   }
 
@@ -512,7 +556,7 @@ class GameApp {
       this.state.settings.sensitivity
     );
 
-    // Live VU meter in Teacher Panel (only show active dB when mic is on or simulated)
+    // Live VU meter in Teacher Panel
     const isSignalActive = this.mic.isListening || this.simulatedDb !== null;
     this.panel.updateMicLiveMeter(
       sample.rawDb,
@@ -532,38 +576,61 @@ class GameApp {
     );
 
     const currentZone = zoneState.zone;
+    const activeClassData = this.state.classes[this.state.activeClass];
 
-    // 4. Physical reaction to voice across modes:
+    // Track quiet time statistics for active class when mic is active
+    if (isSignalActive && currentZone === 'green' && activeClassData) {
+      activeClassData.quietSeconds = (activeClassData.quietSeconds || 0) + dt;
+      this.quietStatSaveTimer += dt;
+      if (this.quietStatSaveTimer >= 15) {
+        this.quietStatSaveTimer = 0;
+        this.saveState();
+        this.panel.updateClassStatsUI();
+      }
+    }
+
+    // 4. Physical reaction to voice across modes (Significantly boosted!)
     if (modeConfig.id === 'breaktime') {
-      if (evalResult.progress > 0.25) {
-        const impulse = (evalResult.progress - 0.2) * 26;
+      if (evalResult.progress > 0.2) {
+        const impulse = (evalResult.progress - 0.18) * 38;
         this.physics.bounceBalls(impulse);
       }
     } else {
-      if (currentZone === 'yellow' || (evalResult.progress >= 0.6 && currentZone !== 'red')) {
-        this.physics.stirBalls(evalResult.progress);
+      if (evalResult.progress > 0.25 && currentZone === 'green') {
+        this.physics.voicePulse(evalResult.progress);
+      }
+
+      if (currentZone === 'yellow' || (evalResult.progress >= 0.55 && currentZone !== 'red')) {
+        this.physics.stirBalls(evalResult.progress * 1.25);
       }
 
       if (currentZone === 'red') {
         if (zoneState.changed) {
-          this.physics.scareBounce(1.5);
+          this.physics.scareBounce(1.75);
           this.hud.triggerScreenShake();
           this.hud.triggerJarBounce();
         } else {
-          this.physics.chaosAgitate(evalResult.progress);
+          this.physics.chaosAgitate(Math.max(1.0, evalResult.progress * 1.35));
         }
       }
     }
 
-    if (currentZone === 'red' && zoneState.changed && modeConfig.rewardsEnabled) {
-      if (now - this.lastAlertTime > CONFIG.alertCooldownMs) {
+    // 4b. Alert Sound & Repeating Signal during sustained Red Zone noise
+    if (currentZone === 'red') {
+      const repeatSec = this.state.settings.alertRepeatSec ?? CONFIG.defaultAlertRepeatSec;
+      const repeatMs = repeatSec > 0 ? repeatSec * 1000 : 0;
+      const shouldPlayInitial = zoneState.changed && (now - this.lastAlertTime > CONFIG.alertCooldownMs);
+      const shouldPlayRepeat = !zoneState.changed && repeatMs > 0 && (now - this.lastAlertTime >= repeatMs);
+
+      if (shouldPlayInitial || shouldPlayRepeat) {
         this.lastAlertTime = now;
         this.hud.showAlert();
+        sfx.playAlert(this.state.settings.alertSound);
 
-        if (this.state.settings.alertSound === 'shush') {
-          sfx.playShush();
-        } else if (this.state.settings.alertSound === 'beep') {
-          sfx.playBeep();
+        if (shouldPlayRepeat) {
+          // Give an extra strong bounce & shake on each repeat alert so kids notice!
+          this.physics.scareBounce(1.55);
+          this.hud.triggerScreenShake();
         }
       }
     }
@@ -571,6 +638,9 @@ class GameApp {
     // 5. Star Rewards Update
     const starRes = this.stars.update(currentZone, dt, modeConfig.rewardsEnabled);
     if (starRes.starAwarded) {
+      if (activeClassData) {
+        activeClassData.totalStars = (activeClassData.totalStars || 0) + 1;
+      }
       const jarCoords = this.hud.getJarMouthCoords();
       this.renderer.particles.spawnFlyingStar(
         this.renderer.width * 0.5,
@@ -581,15 +651,24 @@ class GameApp {
           this.displayedStars = this.stars.stars;
           sfx.playChime();
           this.hud.triggerJarBounce();
-          this.checkWeeklyGoal();
+          this.checkGoalReached();
         }
       );
       this.saveClassStars();
     }
 
-    // 6. Task Timer Update
+    // 6. Task Timer Update (+1 task statistic on completion!)
     const timerRes = this.session.update(dt, currentZone);
     if (timerRes.completed) {
+      if (activeClassData) {
+        activeClassData.tasksCompleted = (activeClassData.tasksCompleted || 0) + 1;
+        if (timerRes.cleanStreak) {
+          activeClassData.cleanTasks = (activeClassData.cleanTasks || 0) + 1;
+        }
+        this.saveState();
+        this.hud.renderClassSwitcher(this.state.classes, this.state.activeClass);
+        this.panel.updateClassStatsUI();
+      }
       sfx.playFanfare();
       this.renderer.particles.spawnConfetti(this.renderer.width, this.renderer.height);
       if (timerRes.cleanStreak && modeConfig.rewardsEnabled) {
@@ -611,7 +690,6 @@ class GameApp {
     );
 
     // 9. HUD Updates
-    const activeClassData = this.state.classes[this.state.activeClass] || { reward: '5 хв мультика' };
     this.hud.updateNoiseMeter(
       currentZone,
       evalResult.progress,
@@ -623,7 +701,7 @@ class GameApp {
       this.stars.goal,
       starRes.progress,
       starRes.isGolden,
-      activeClassData.reward
+      activeClassData?.reward || '5 хв мультика'
     );
     this.hud.updateTimer(timerRes.remaining, timerRes.running);
   }

@@ -16,12 +16,13 @@ export class HUD {
   /**
    * @param {object} callbacks
    * @param {Function} callbacks.onModeChange
+   * @param {Function} callbacks.onClassChange
    * @param {Function} callbacks.onQuickCalibrate
    * @param {Function} callbacks.onPanelToggle
    * @param {Function} callbacks.onTimerToggle
-   * @param {Function} callbacks.onResetWeek
+   * @param {Function} callbacks.onResetGoal
    */
-  constructor(callbacks = {}) {
+  constructor(callbacks = {}, initialClasses = {}, activeClass = '4-Б') {
     this.callbacks = callbacks;
     this.container = document.createElement('div');
     this.container.className = 'hud-container';
@@ -29,38 +30,43 @@ export class HUD {
     this.container.innerHTML = `
       <!-- Top Bar in TV Safe Area -->
       <div class="hud-top">
-        <!-- Left: Noise Traffic Light & Visual Threshold Wave Meter -->
-        <div class="traffic-light-meter" id="traffic-light">
-          <div class="traffic-dots">
-            <div class="light-dot green active" title="Тиша (зелена зона)"></div>
-            <div class="light-dot yellow" title="Шепіт (жовта зона)"></div>
-            <div class="light-dot red" title="Шум (червона зона)"></div>
+        <!-- Left: Noise Traffic Light + Liquid Glass Quick Class Switcher -->
+        <div class="hud-left">
+          <div class="traffic-light-meter liquid-glass-surface" id="traffic-light">
+            <div class="traffic-dots">
+              <div class="light-dot green active" title="Тиша (зелена зона)"></div>
+              <div class="light-dot yellow" title="Шепіт (жовта зона)"></div>
+              <div class="light-dot red" title="Шум (червона зона)"></div>
+            </div>
+            <div class="sound-meter-wrap" id="sound-meter-wrap">
+              <div class="meter-threshold-tick yellow-tick" title="Поріг жовтої зони"></div>
+              <div class="meter-threshold-tick red-tick" title="Поріг червоної зони"></div>
+              <div class="db-bar" id="db-bar"></div>
+            </div>
+            <button class="hud-icon-btn" id="cal-quick-btn" title="${t('calibrateBtn')}">
+              ${iconCalibrate()}
+            </button>
           </div>
-          <div class="sound-meter-wrap" id="sound-meter-wrap">
-            <div class="meter-threshold-tick yellow-tick" title="Поріг жовтої зони"></div>
-            <div class="meter-threshold-tick red-tick" title="Поріг червоної зони"></div>
-            <div class="db-bar" id="db-bar"></div>
+
+          <div class="hud-class-switcher liquid-glass-pillbar" id="hud-class-switcher" title="Швидкий вибір групи / потоку">
           </div>
-          <button class="hud-icon-btn" id="cal-quick-btn" title="${t('calibrateBtn')}">
-            ${iconCalibrate()}
-          </button>
         </div>
 
-        <!-- Center: Interactive Quick Mode Switcher & Timer -->
+        <!-- Center: Interactive Liquid Glass Mode Switcher & Timer -->
         <div class="hud-center">
-          <div class="mode-segmented-control" id="hud-mode-control">
-            <button class="hud-mode-tab active" data-mode="quiet">
+          <div class="mode-segmented-control liquid-glass-pillbar" id="hud-mode-control">
+            <button class="hud-mode-tab liquid-glass-tab active" data-mode="quiet">
               <span>Тиха робота</span>
             </button>
-            <button class="hud-mode-tab" data-mode="groups">
+            <button class="hud-mode-tab liquid-glass-tab" data-mode="groups">
               <span>Групи</span>
             </button>
-            <button class="hud-mode-tab" data-mode="breaktime">
+            <button class="hud-mode-tab liquid-glass-tab" data-mode="breaktime">
               <span>Перерва</span>
             </button>
           </div>
 
-          <div class="timer-display hidden" id="timer-display">
+          <div class="timer-display liquid-glass-surface hidden" id="timer-display">
             <span class="timer-digits" id="timer-digits">05:00</span>
             <button class="timer-btn" id="timer-toggle-btn">
               ${iconPause()}
@@ -70,7 +76,7 @@ export class HUD {
 
         <!-- Right: Glass Star Jar & Settings Toggle -->
         <div class="hud-right">
-          <div class="star-jar-widget" id="star-jar-widget" title="Банка зірок класу">
+          <div class="star-jar-widget liquid-glass-surface" id="star-jar-widget" title="Банка зірок">
             <div class="jar-ring-container">
               <svg class="star-progress-ring" viewBox="0 0 54 54">
                 <circle class="ring-bg" cx="27" cy="27" r="23"></circle>
@@ -88,7 +94,7 @@ export class HUD {
             </div>
           </div>
 
-          <button class="panel-toggle-btn" id="panel-toggle-btn" title="Налаштування (H)">
+          <button class="panel-toggle-btn liquid-glass-surface" id="panel-toggle-btn" title="Налаштування (H)">
             ${iconGear()}
           </button>
         </div>
@@ -119,12 +125,12 @@ export class HUD {
       <!-- Goal Achieved Modal -->
       <div class="goal-modal-overlay hidden" id="goal-modal">
         <div class="goal-modal-card">
-          <h2>Ціль тижня виконано</h2>
-          <p class="goal-modal-subtitle">Нагорода класу:</p>
+          <h2>Ціль досягнуто!</h2>
+          <p class="goal-modal-subtitle">Заслужена нагорода:</p>
           <div class="goal-modal-reward" id="goal-modal-reward">${iconGift()} <span>5 хв мультика</span></div>
           <div class="goal-modal-actions">
             <button class="goal-action-btn primary" id="btn-goal-reset">
-              ${iconReset()} Новий тиждень
+              ${iconReset()} Нова ціль
             </button>
             <button class="goal-action-btn secondary" id="btn-goal-close">
               Закрити
@@ -141,6 +147,7 @@ export class HUD {
     this.dotYellow = this.container.querySelector('.light-dot.yellow');
     this.dotRed = this.container.querySelector('.light-dot.red');
     this.dbBar = this.container.querySelector('#db-bar');
+    this.classSwitcher = this.container.querySelector('#hud-class-switcher');
     this.modeControl = this.container.querySelector('#hud-mode-control');
     this.timerDisplay = this.container.querySelector('#timer-display');
     this.timerDigits = this.container.querySelector('#timer-digits');
@@ -165,7 +172,29 @@ export class HUD {
     this.starRingFill.style.strokeDasharray = `${this.ringCircumference} ${this.ringCircumference}`;
     this.starRingFill.style.strokeDashoffset = this.ringCircumference;
 
+    this.renderClassSwitcher(initialClasses, activeClass);
     this.bindEvents();
+  }
+
+  renderClassSwitcher(classesObj = {}, activeClass = '') {
+    if (!this.classSwitcher) return;
+    const names = Object.keys(classesObj);
+    this.classSwitcher.innerHTML = names.map((name) => {
+      const c = classesObj[name];
+      const tasksBadge = c?.tasksCompleted > 0 ? `<span class="hud-class-stat" title="Виконано завдань">✓${c.tasksCompleted}</span>` : '';
+      return `
+        <button class="hud-class-tab liquid-glass-tab ${name === activeClass ? 'active' : ''}" data-class="${name}">
+          <span>${name}</span>${tasksBadge}
+        </button>
+      `;
+    }).join('');
+
+    this.classSwitcher.querySelectorAll('.hud-class-tab').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const cls = btn.dataset.class;
+        this.callbacks.onClassChange?.(cls);
+      });
+    });
   }
 
   bindEvents() {
@@ -200,7 +229,7 @@ export class HUD {
     });
     this.container.querySelector('#btn-goal-reset')?.addEventListener('click', () => {
       this.goalModal.classList.add('hidden');
-      if (this.callbacks.onResetWeek) this.callbacks.onResetWeek();
+      if (this.callbacks.onResetGoal) this.callbacks.onResetGoal();
     });
   }
 
@@ -289,11 +318,11 @@ export class HUD {
       setTimeout(() => {
         this.alertBanner.classList.add('hidden');
       }, 350);
-    }, 2400);
+    }, 2200);
   }
 
-  showGoalReachedModal(rewardText, onResetWeek = null) {
-    if (onResetWeek) this.callbacks.onResetWeek = onResetWeek;
+  showGoalReachedModal(rewardText, onResetGoal = null) {
+    if (onResetGoal) this.callbacks.onResetGoal = onResetGoal;
     this.goalModalReward.innerHTML = `${iconGift()} <span>${rewardText || 'Нагорода'}</span>`;
     this.goalModal.classList.remove('hidden');
   }

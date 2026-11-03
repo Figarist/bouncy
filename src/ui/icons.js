@@ -112,6 +112,19 @@ export function iconPlus() {
   </svg>`;
 }
 
+export function iconTrash() {
+  return `<svg class="ui-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="3 6 5 6 21 6"></polyline>
+    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+  </svg>`;
+}
+
+export function iconCheck() {
+  return `<svg class="ui-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="20 6 9 17 4 12"></polyline>
+  </svg>`;
+}
+
 export function iconReset() {
   return `<svg class="ui-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
     <polyline points="1 4 1 10 7 10"></polyline>
@@ -165,14 +178,13 @@ export function iconLab() {
 /**
  * Beautiful SVG Star Jar with cork lid, glass glare, and floating gold stars inside.
  * @param {number} stars current stars count
- * @param {number} goal weekly goal
+ * @param {number} goal target goal
  */
 export function renderStarJarSvg(stars = 0, goal = 20) {
   const fillPct = Math.min(1.0, Math.max(0, stars / Math.max(1, goal)));
   const fillHeight = 22 * fillPct;
   const fillY = 33 - fillHeight;
 
-  // Star markers inside jar
   const starList = [];
   if (stars >= 1) starList.push('<circle cx="12" cy="31" r="1.5" fill="#FFFFFF"/>');
   if (stars >= 2) starList.push('<polygon points="20,28 20.8,29.8 22.8,30.1 21.3,31.5 21.7,33.5 20,32.5 18.3,33.5 18.7,31.5 17.2,30.1 19.2,29.8" fill="#FFF3BF"/>');
@@ -210,14 +222,9 @@ export function renderStarJarSvg(stars = 0, goal = 20) {
 
     <!-- Glass Body Fill (clipped to jar shape) -->
     <g clip-path="url(#jarInnerClip)">
-      <!-- Background of jar interior -->
       <rect x="4" y="9" width="28" height="28" fill="rgba(255, 255, 255, 0.08)"/>
-
-      <!-- Golden stars liquid/glow level -->
       ${fillPct > 0 ? `<rect x="5" y="${fillY}" width="26" height="${fillHeight + 4}" fill="url(#jarFillGrad)"/>
       <ellipse cx="18" cy="${fillY}" rx="12" ry="2.2" fill="#FFF3BF"/>` : ''}
-
-      <!-- Mini floating stars inside -->
       ${starList.join('\n      ')}
     </g>
 
@@ -235,6 +242,33 @@ export function renderStarJarSvg(stars = 0, goal = 20) {
  */
 export function getThemeCardIllustration(themeId) {
   switch (themeId) {
+    case 'craft':
+      return `<svg viewBox="0 0 40 40" width="38" height="38">
+        <rect x="6" y="6" width="28" height="28" rx="5" fill="#40C057" stroke="#111827" stroke-width="2"/>
+        <rect x="8" y="8" width="24" height="5" rx="2" fill="#8CE99A"/>
+        <rect x="11" y="13" width="6" height="6" fill="#111827"/>
+        <rect x="23" y="13" width="6" height="6" fill="#111827"/>
+        <rect x="16" y="19" width="8" height="6" fill="#111827"/>
+        <rect x="13" y="23" width="4" height="6" fill="#111827"/>
+        <rect x="23" y="23" width="4" height="6" fill="#111827"/>
+      </svg>`;
+    case 'blox':
+      return `<svg viewBox="0 0 40 40" width="38" height="38">
+        <rect x="14" y="4" width="12" height="4" rx="1.5" fill="#F59F00" stroke="#111827" stroke-width="1.8"/>
+        <rect x="7" y="7" width="26" height="26" rx="8" fill="#FFD43B" stroke="#111827" stroke-width="2"/>
+        <rect x="10" y="32" width="20" height="4" rx="2" fill="#1C7ED6" stroke="#111827" stroke-width="1.5"/>
+        <circle cx="15" cy="18" r="2.2" fill="#111827"/>
+        <circle cx="25" cy="18" r="2.2" fill="#111827"/>
+        <path d="M14 25 Q21 29 27 22" stroke="#111827" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+      </svg>`;
+    case 'brawl':
+      return `<svg viewBox="0 0 40 40" width="38" height="38">
+        <circle cx="20" cy="6" r="4" fill="#FA5252" stroke="#111827" stroke-width="1.8"/>
+        <circle cx="20" cy="22" r="14" fill="#51CF66" stroke="#111827" stroke-width="2.4"/>
+        <circle cx="15" cy="19" r="2.8" fill="#18181B"/>
+        <circle cx="25" cy="19" r="2.8" fill="#18181B"/>
+        <circle cx="20" cy="26" r="3.2" fill="#18181B"/>
+      </svg>`;
     case 'critters':
       return `<svg viewBox="0 0 40 40" width="38" height="38">
         <circle cx="20" cy="21" r="15" fill="#38D9A9"/>
