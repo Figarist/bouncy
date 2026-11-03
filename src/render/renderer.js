@@ -5,7 +5,12 @@ import { drawBubble } from './themes/bubbles.js';
 import { drawEyes } from './themes/eyes.js';
 import { drawCritter } from './themes/critters.js';
 import { drawSpace } from './themes/space.js';
+import { drawCraft } from './themes/craft.js';
+import { drawBlox } from './themes/blox.js';
+import { drawBrawl } from './themes/brawl.js';
 import { ParticleSystem } from '../world/particles.js';
+
+const ZZZ_THEMES = new Set(['critters', 'emoji', 'craft', 'blox', 'brawl']);
 
 export class CanvasRenderer {
   /**
@@ -106,7 +111,7 @@ export class CanvasRenderer {
     }
 
     // 2. Periodic Zzz spawning when quiet
-    if (zone === 'green' && (this.theme === 'critters' || this.theme === 'emoji')) {
+    if (zone === 'green' && ZZZ_THEMES.has(this.theme)) {
       this.zzzTimer += dt;
       if (this.zzzTimer > 1.2 && world.balls.length > 0) {
         this.zzzTimer = 0;
@@ -120,7 +125,6 @@ export class CanvasRenderer {
     }
 
     // 3. Contact Floor Shadows for all balls
-    // Cast an elliptical soft contact shadow underneath each ball near the ground
     for (const ball of world.balls) {
       const distFromFloor = h - (ball.y + ball.radius);
       if (distFromFloor < ball.radius * 2.8) {
@@ -145,6 +149,15 @@ export class CanvasRenderer {
       ctx.scale(ball.scaleX, ball.scaleY);
 
       switch (this.theme) {
+        case 'craft':
+          drawCraft(ctx, ball);
+          break;
+        case 'blox':
+          drawBlox(ctx, ball);
+          break;
+        case 'brawl':
+          drawBrawl(ctx, ball);
+          break;
         case 'plastic':
           drawPlastic(ctx, ball);
           break;

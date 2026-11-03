@@ -53,67 +53,83 @@ export class PhysicsWorld {
   }
 
   /**
-   * Classic bouncy balls voice impulse (breaktime mode)
+   * Classic bouncy balls voice impulse (breaktime mode) — strong high leaps!
    */
   bounceBalls(impulseMagnitude) {
     if (impulseMagnitude <= 0) return;
     for (const b of this.balls) {
-      const upward = -impulseMagnitude * (0.8 + Math.random() * 0.4);
-      const horizontal = (Math.random() - 0.5) * impulseMagnitude * 0.5;
+      const upward = -impulseMagnitude * (0.95 + Math.random() * 0.55);
+      const horizontal = (Math.random() - 0.5) * impulseMagnitude * 0.75;
       b.applyImpulse(horizontal, upward);
-      b.angularVelocity += (Math.random() - 0.5) * 5.0;
+      b.angularVelocity += (Math.random() - 0.5) * 7.0;
+      b.triggerSquash(0, 1, Math.min(8, impulseMagnitude * 0.35));
     }
   }
 
   /**
-   * Yellow Zone voice stirring: balls tremble and hop visibly, showing noise awareness
-   * without creating chaos or encouraging shouting.
+   * Subtle voice pulse when sound starts rising above ambient floor before yellow zone.
+   */
+  voicePulse(progress) {
+    const factor = Math.max(0, progress - 0.25);
+    if (factor <= 0) return;
+    for (const b of this.balls) {
+      if (b.y >= this.height - b.radius * 2.4 && Math.random() < 0.08) {
+        const hop = (1.8 + Math.random() * 2.8) * factor;
+        const jitterX = (Math.random() - 0.5) * 2.2 * factor;
+        b.applyImpulse(jitterX, -hop);
+        b.triggerSquash(0, 1, hop * 0.6);
+      }
+    }
+  }
+
+  /**
+   * Yellow Zone voice stirring: balls visibly jump and jostle, showing clear reactivity to chatter!
    * @param {number} intensity 0.0 .. 1.5
    */
   stirBalls(intensity) {
-    const factor = Math.min(1.2, Math.max(0.2, intensity));
+    const factor = Math.min(1.5, Math.max(0.35, intensity));
     for (const b of this.balls) {
-      // Only stir balls on or near the floor
-      if (b.y >= this.height - b.radius * 2.5) {
-        if (Math.random() < 0.14) {
-          const hop = (2.2 + Math.random() * 3.6) * factor;
-          const jitterX = (Math.random() - 0.5) * 2.5 * factor;
+      // Affect balls in the lower third of the screen
+      if (b.y >= this.height - b.radius * 4.0) {
+        if (Math.random() < 0.28) {
+          const hop = (5.0 + Math.random() * 8.5) * factor;
+          const jitterX = (Math.random() - 0.5) * 6.5 * factor;
           b.applyImpulse(jitterX, -hop);
-          b.angularVelocity += (Math.random() - 0.5) * 4.0 * factor;
-          b.triggerSquash(0, 1, hop * 0.7);
+          b.angularVelocity += (Math.random() - 0.5) * 6.0 * factor;
+          b.triggerSquash(0, 1, hop * 0.65);
         }
       }
     }
   }
 
   /**
-   * Red Zone scare hop: sudden noise shock makes all balls flinch and jump high up in fright!
+   * Red Zone scare hop: sudden noise shock launches all balls high up across the screen!
    */
   scareBounce(intensity = 1.0) {
-    const mag = Math.min(24, 15 * intensity);
+    const mag = Math.min(42, 22 * intensity);
     for (const b of this.balls) {
-      const upward = -mag * (0.85 + Math.random() * 0.45);
-      const horizontal = (Math.random() - 0.5) * mag * 0.7;
+      const upward = -mag * (0.9 + Math.random() * 0.55);
+      const horizontal = (Math.random() - 0.5) * mag * 0.9;
       b.applyImpulse(horizontal, upward);
-      b.angularVelocity += (Math.random() - 0.5) * 10.0;
-      b.triggerSquash(0, 1, 4.0);
+      b.angularVelocity += (Math.random() - 0.5) * 14.0;
+      b.triggerSquash(0, 1, 6.0);
     }
   }
 
   /**
    * Ongoing chaos in Red Zone during sustained noise:
-   * Keeps balls agitated, hopping and colliding chaotically.
+   * Keeps balls vigorously flying, bouncing, and colliding until the room quiets down.
    */
   chaosAgitate(intensity = 1.0) {
-    const factor = Math.min(1.5, Math.max(0.3, intensity));
+    const factor = Math.min(1.8, Math.max(0.5, intensity));
     for (const b of this.balls) {
-      if (b.y >= this.height - b.radius * 3.0) {
-        if (Math.random() < 0.2) {
-          const hop = (3.5 + Math.random() * 6.5) * factor;
-          const jitterX = (Math.random() - 0.5) * 5.0 * factor;
+      if (b.y >= this.height - b.radius * 6.0) {
+        if (Math.random() < 0.42) {
+          const hop = (8.5 + Math.random() * 14.5) * factor;
+          const jitterX = (Math.random() - 0.5) * 11.0 * factor;
           b.applyImpulse(jitterX, -hop);
-          b.angularVelocity += (Math.random() - 0.5) * 6.0 * factor;
-          b.triggerSquash(0, 1, 2.5);
+          b.angularVelocity += (Math.random() - 0.5) * 9.0 * factor;
+          b.triggerSquash(0, 1, 4.0);
         }
       }
     }
@@ -266,11 +282,11 @@ export class PhysicsWorld {
 
               // Light squishing on hard ball collisions
               const relSpeed = Math.abs((b1.x - b1.px) - (b2.x - b2.px)) + Math.abs((b1.y - b1.py) - (b2.y - b2.py));
-              if (relSpeed > 4) {
-                b1.triggerSquash(-nx, -ny, relSpeed * 0.3);
-                b2.triggerSquash(nx, ny, relSpeed * 0.3);
-                b1.angularVelocity += (Math.random() - 0.5) * relSpeed * 0.4;
-                b2.angularVelocity += (Math.random() - 0.5) * relSpeed * 0.4;
+              if (relSpeed > 3) {
+                b1.triggerSquash(-nx, -ny, relSpeed * 0.35);
+                b2.triggerSquash(nx, ny, relSpeed * 0.35);
+                b1.angularVelocity += (Math.random() - 0.5) * relSpeed * 0.45;
+                b2.angularVelocity += (Math.random() - 0.5) * relSpeed * 0.45;
               }
             }
           }

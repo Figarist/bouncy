@@ -13,6 +13,8 @@ import {
   iconLaptop,
   iconSliders,
   iconVolume,
+  iconTrash,
+  iconCheck,
   renderStarJarSvg,
   getThemeCardIllustration,
 } from '../src/ui/icons.js';
@@ -27,11 +29,13 @@ describe('Icons & Visuals SVG generator', () => {
     expect(offSvg).toContain('icon-mic off');
   });
 
-  it('generates valid SVG for calibrate, gear, and stars', () => {
+  it('generates valid SVG for calibrate, gear, stars, trash, and check', () => {
     expect(iconCalibrate()).toContain('<svg');
     expect(iconGear()).toContain('<svg');
     expect(iconStar(true)).toContain('#FFD43B');
     expect(iconStar(false)).toContain('fill="none"');
+    expect(iconTrash()).toContain('<svg');
+    expect(iconCheck()).toContain('<svg');
   });
 
   it('generates valid SVG for lock, gift, party, sparkles, and lab', () => {
@@ -63,8 +67,8 @@ describe('Icons & Visuals SVG generator', () => {
     expect(fullJar).toContain('<polygon');
   });
 
-  it('provides visual theme illustrations for all 7 themes', () => {
-    const themes = ['critters', 'space', 'bubbles', 'emoji', 'plastic', 'numbers', 'eyes'];
+  it('provides visual theme illustrations for all 10 themes including craft, blox, and brawl', () => {
+    const themes = ['craft', 'blox', 'brawl', 'critters', 'space', 'bubbles', 'emoji', 'plastic', 'numbers', 'eyes'];
     for (const th of themes) {
       const svg = getThemeCardIllustration(th);
       expect(svg).toContain('<svg');

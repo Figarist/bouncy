@@ -8,8 +8,9 @@ export const CONFIG = {
     attack: 0.04,  // Fast rise (~40ms) so sudden speech & noise spikes are caught immediately
     release: 0.35, // Smooth release prevents visual flickering while staying responsive
   },
-  sfxMicMuteMs: 700,     // Ignore microphone when game sfx is playing to prevent TV speaker loop
-  alertCooldownMs: 3500, // "Quiet!" banner and sfx cooldown
+  sfxMicMuteMs: 750,     // Ignore microphone when game sfx is playing to prevent TV speaker loop
+  alertCooldownMs: 1200, // Minimum gap on initial red-zone entry
+  defaultAlertRepeatSec: 4, // Repeat interval while class stays in Red Zone (0 = play once)
 
   // Lesson modes and zone threshold offsets relative to ambient background noise (dB)
   modes: {
@@ -20,7 +21,7 @@ export const CONFIG = {
       yellowOffsetDb: 4.5, // Whispers, murmurs or desk shuffling trigger yellow & stir balls
       redOffsetDb: 9.0,    // Normal talking / shouts trigger red alert
       rewardsEnabled: true,
-      physicsBounceOnVoice: false, // In quiet mode, balls don't fly on voice to prevent noise addiction
+      physicsBounceOnVoice: false,
     },
     groups: {
       id: 'groups',
@@ -96,8 +97,8 @@ export const CONFIG = {
   physics: {
     hz: 60,
     subSteps: 3,
-    gravity: 0.45,
-    restitution: 0.75, // Bounciness
-    friction: 0.992,
+    gravity: 0.46,
+    restitution: 0.82, // Higher bounciness for lively visual response
+    friction: 0.993,
   },
 };

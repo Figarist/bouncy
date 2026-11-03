@@ -3,18 +3,22 @@ import {
   iconMic,
   iconCalibrate,
   iconFullscreen,
-  iconStar,
   iconClose,
   iconPlus,
+  iconTrash,
   iconReset,
   iconLock,
   iconCamera,
   iconLaptop,
+  iconVolume,
   getThemeCardIllustration,
 } from './icons.js';
 
 const THEMES = [
-  { id: 'critters', title: 'Сплюшки', sub: 'Основна' },
+  { id: 'craft', title: 'Крафт-Куби', sub: 'Піксель-світ' },
+  { id: 'blox', title: 'Блокс-Герої', sub: 'Оббі-аватари' },
+  { id: 'brawl', title: 'Бійці Арени', sub: 'Зіркова ліга' },
+  { id: 'critters', title: 'Сплюшки', sub: 'Монстрики' },
   { id: 'space', title: 'Космос', sub: 'Планети' },
   { id: 'bubbles', title: 'Бульбашки', sub: 'Лопаються' },
   { id: 'emoji', title: 'Емоджі', sub: 'Міміка' },
@@ -45,7 +49,17 @@ export class TeacherPanel {
   render() {
     const s = this.state.settings;
     const activeClass = this.state.activeClass;
-    const classData = this.state.classes[activeClass] || { stars: 0, goal: 20, reward: '5 хв мультика' };
+    const classData = this.state.classes[activeClass] || {
+      stars: 0,
+      goal: 20,
+      reward: '5 хв мультика',
+      totalStars: 0,
+      tasksCompleted: 0,
+      cleanTasks: 0,
+      goalsReached: 0,
+      quietSeconds: 0,
+    };
+    const repeatSec = s.alertRepeatSec ?? 4;
 
     this.panel.innerHTML = `
       <div class="panel-header">
@@ -56,21 +70,168 @@ export class TeacherPanel {
       </div>
 
       <div class="panel-body">
-        <!-- Lesson Mode Presets (Compact 3-column workbench control) -->
+        <!-- Lesson Mode Presets (Liquid Glass Segmented Control) -->
         <div class="setting-group">
           <label class="setting-label">Режим уроку</label>
-          <div class="mode-buttons-grid">
-            <button class="mode-card-btn ${s.mode === 'quiet' ? 'active' : ''}" data-mode="quiet">
+          <div class="liquid-glass-pillbar panel-pillbar" id="panel-mode-grid">
+            <button class="liquid-glass-tab mode-card-btn ${s.mode === 'quiet' ? 'active' : ''}" data-mode="quiet">
               Тиха робота
             </button>
-            <button class="mode-card-btn ${s.mode === 'groups' ? 'active' : ''}" data-mode="groups">
+            <button class="liquid-glass-tab mode-card-btn ${s.mode === 'groups' ? 'active' : ''}" data-mode="groups">
               Групи
             </button>
-            <button class="mode-card-btn ${s.mode === 'breaktime' ? 'active' : ''}" data-mode="breaktime">
+            <button class="liquid-glass-tab mode-card-btn ${s.mode === 'breaktime' ? 'active' : ''}" data-mode="breaktime">
               Перерва
             </button>
           </div>
           <div class="mode-tech-hint" id="mode-tech-desc">${MODE_TECH_NOTES[s.mode] || MODE_TECH_NOTES.quiet}</div>
+        </div>
+
+        <!-- Theme Selection Grid (Kids' favorites first!) -->
+        <div class="setting-group section-divider">
+          <label class="setting-label">Тема кульок</label>
+          <div class="themes-grid" id="themes-grid">
+            ${THEMES.map(th => `
+              <button class="theme-card ${s.theme === th.id ? 'active' : ''}" data-theme="${th.id}">
+                <div class="theme-card-icon">${getThemeCardIllustration(th.id)}</div>
+                <div class="theme-card-info">
+                  <span class="theme-title">${th.title}</span>
+                  <span class="theme-sub">${th.sub}</span>
+                </div>
+              </button>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- Alert Sound, Preview & Repeat Interval -->
+        <div class="setting-group section-divider">
+          <div class="slider-header">
+            <label class="setting-label">Звуковий сигнал (клік = прослухати)</label>
+            <button class="preview-sound-btn" id="btn-preview-sound" title="Прослухати поточний сигнал">
+              ${iconVolume()} Тест
+            </button>
+          </div>
+          <div class="liquid-glass-pillbar panel-pillbar" id="sound-control">
+            <button class="liquid-glass-tab segmented-tab ${s.alertSound === 'shush' ? 'active' : ''}" data-sound="shush">
+              Тссс!
+            </button>
+            <button class="liquid-glass-tab segmented-tab ${s.alertSound === 'beep' ? 'active' : ''}" data-sound="beep">
+              Радар
+            </button>
+            <button class="liquid-glass-tab segmented-tab ${s.alertSound === 'bell' ? 'active' : ''}" data-sound="bell">
+              Дзвоник
+            </button>
+            <button class="liquid-glass-tab segmented-tab ${s.alertSound === 'arcade' ? 'active' : ''}" data-sound="arcade">
+              Аркада
+            </button>
+            <button class="liquid-glass-tab segmented-tab ${s.alertSound === 'none' ? 'active' : ''}" data-sound="none">
+              Вимк.
+            </button>
+          </div>
+
+          <div class="repeat-interval-row">
+            <span class="sub-label">Повторювати сигнал, доки триває шум:</span>
+            <div class="liquid-glass-pillbar panel-pillbar" id="repeat-control">
+              <button class="liquid-glass-tab repeat-tab ${repeatSec === 2 ? 'active' : ''}" data-repeat="2">
+                Кожні 2 с
+              </button>
+              <button class="liquid-glass-tab repeat-tab ${repeatSec === 4 ? 'active' : ''}" data-repeat="4">
+                Кожні 4 с
+              </button>
+              <button class="liquid-glass-tab repeat-tab ${repeatSec === 8 ? 'active' : ''}" data-repeat="8">
+                Кожні 8 с
+              </button>
+              <button class="liquid-glass-tab repeat-tab ${repeatSec === 0 ? 'active' : ''}" data-repeat="0">
+                1 раз
+              </button>
+            </div>
+          </div>
+
+          <div class="slider-header" style="margin-top: 4px;">
+            <span>Гучність SFX (підсилена)</span>
+            <span class="slider-val" id="val-volume">${Math.round(s.volume * 100)}%</span>
+          </div>
+          <input type="range" class="slider" id="slider-volume" min="0" max="1.2" step="0.05" value="${s.volume}">
+        </div>
+
+        <!-- Class Manager, Statistics & Goal (No 'Weekly' or 'Class' label clutter) -->
+        <div class="setting-group section-divider">
+          <div class="slider-header">
+            <label class="setting-label">Менеджер груп та Ціль</label>
+            <button class="icon-danger-btn" id="btn-delete-class" title="Видалити поточний запис">
+              ${iconTrash()}
+            </button>
+          </div>
+
+          <div class="class-selector-row">
+            <div class="liquid-glass-pillbar class-buttons" id="class-buttons-list">
+              ${Object.keys(this.state.classes).map(c => `
+                <button class="liquid-glass-tab class-tab-btn ${c === activeClass ? 'active' : ''}" data-class="${c}">
+                  ${c}
+                </button>
+              `).join('')}
+            </div>
+          </div>
+
+          <div class="class-add-inline">
+            <input type="text" class="text-input" id="input-new-class" maxlength="14" placeholder="Новий (напр. 5-А, Група 2)">
+            <button class="action-btn-small" id="btn-add-class" title="Додати у список">
+              ${iconPlus()} Додати
+            </button>
+          </div>
+
+          <!-- Class Statistics Telemetry Strip -->
+          <div class="class-stats-strip" id="class-stats-strip">
+            <div class="stat-cell">
+              <span class="stat-val" id="stat-total-stars">${classData.totalStars || classData.stars || 0}</span>
+              <span class="stat-lbl">Усього зірок</span>
+            </div>
+            <div class="stat-cell stat-cell-interactive" id="btn-stat-add-task" title="Натисніть, щоб зарахувати +1 виконане завдання">
+              <div class="stat-val-row">
+                <span class="stat-val" id="stat-tasks">${classData.tasksCompleted || 0}</span>
+                <span class="stat-plus-badge">+1</span>
+              </div>
+              <span class="stat-lbl">Завдань</span>
+            </div>
+            <div class="stat-cell">
+              <span class="stat-val" id="stat-goals">${classData.goalsReached || 0}</span>
+              <span class="stat-lbl">Призів</span>
+            </div>
+            <div class="stat-cell">
+              <span class="stat-val" id="stat-quiet-min">${Math.floor((classData.quietSeconds || 0) / 60)} хв</span>
+              <span class="stat-lbl">Час тиші</span>
+            </div>
+          </div>
+
+          <div class="goal-reward-edit">
+            <div class="goal-input-wrap">
+              <span>Ціль:</span>
+              <input type="number" class="num-input" id="input-goal" min="3" max="200" value="${classData.goal}">
+              <span>зірок</span>
+              <button class="chip-btn-gold" id="btn-add-star" title="Нарахувати +1 зірку (S)">
+                +1 зірка
+              </button>
+            </div>
+            <div class="reward-input-wrap">
+              <span>Приз:</span>
+              <input type="text" class="text-input" id="input-reward" value="${classData.reward}" placeholder="5 хв мультика / гра">
+            </div>
+            <button class="action-btn-danger" id="btn-reset-goal" title="Обнулити поточну банку зірок для нової цілі (загальна статистика зберігається)">
+              ${iconReset()} Скинути поточні зірки (0/${classData.goal})
+            </button>
+          </div>
+        </div>
+
+        <!-- Task Timer -->
+        <div class="setting-group section-divider">
+          <label class="setting-label">Таймер завдання (+1 у статистику після завершення)</label>
+          <div class="timer-chips">
+            <button class="chip-btn" data-min="1">1 хв</button>
+            <button class="chip-btn" data-min="2">2 хв</button>
+            <button class="chip-btn" data-min="5">5 хв</button>
+            <button class="chip-btn" data-min="10">10 хв</button>
+            <button class="chip-btn" data-min="15">15 хв</button>
+          </div>
         </div>
 
         <!-- Microphone & Hardware Adaptation -->
@@ -94,14 +255,14 @@ export class TeacherPanel {
 
           <div class="mic-profiles-group">
             <span class="sub-label">Профіль обладнання (HPF + Presence):</span>
-            <div class="mic-profiles-row">
-              <button class="profile-chip-btn ${s.micProfile === 'webcam' ? 'active' : ''}" data-profile="webcam" title="120 Hz HPF + 2.2 kHz (+3.5 dB) + Gain 2.2x">
+            <div class="liquid-glass-pillbar panel-pillbar">
+              <button class="liquid-glass-tab profile-chip-btn ${s.micProfile === 'webcam' ? 'active' : ''}" data-profile="webcam" title="120 Hz HPF + 2.2 kHz (+3.5 dB) + Gain 2.2x">
                 ${iconCamera()} <span>Вебкамера</span>
               </button>
-              <button class="profile-chip-btn ${s.micProfile === 'laptop' ? 'active' : ''}" data-profile="laptop" title="100 Hz HPF + 2.0 kHz (+2.0 dB) + Gain 1.5x">
+              <button class="liquid-glass-tab profile-chip-btn ${s.micProfile === 'laptop' ? 'active' : ''}" data-profile="laptop" title="100 Hz HPF + 2.0 kHz (+2.0 dB) + Gain 1.5x">
                 ${iconLaptop()} <span>Ноутбук</span>
               </button>
-              <button class="profile-chip-btn ${s.micProfile === 'close' ? 'active' : ''}" data-profile="close" title="80 Hz HPF + прямий сигнал 1.0x">
+              <button class="liquid-glass-tab profile-chip-btn ${s.micProfile === 'close' ? 'active' : ''}" data-profile="close" title="80 Hz HPF + прямий сигнал 1.0x">
                 ${iconMic(true)} <span>Гарнітура</span>
               </button>
             </div>
@@ -159,93 +320,6 @@ export class TeacherPanel {
             <span class="slider-val" id="val-balls">${s.balls}</span>
           </div>
           <input type="range" class="slider" id="slider-balls" min="10" max="150" step="5" value="${s.balls}">
-        </div>
-
-        <!-- Theme Selection Grid -->
-        <div class="setting-group section-divider">
-          <label class="setting-label">Тема сцени</label>
-          <div class="themes-grid" id="themes-grid">
-            ${THEMES.map(th => `
-              <button class="theme-card ${s.theme === th.id ? 'active' : ''}" data-theme="${th.id}">
-                <div class="theme-card-icon">${getThemeCardIllustration(th.id)}</div>
-                <div class="theme-card-info">
-                  <span class="theme-title">${th.title}</span>
-                  <span class="theme-sub">${th.sub}</span>
-                </div>
-              </button>
-            `).join('')}
-          </div>
-        </div>
-
-        <!-- Task Timer -->
-        <div class="setting-group section-divider">
-          <label class="setting-label">Таймер завдання</label>
-          <div class="timer-chips">
-            <button class="chip-btn" data-min="1">1 хв</button>
-            <button class="chip-btn" data-min="2">2 хв</button>
-            <button class="chip-btn" data-min="5">5 хв</button>
-            <button class="chip-btn" data-min="10">10 хв</button>
-            <button class="chip-btn" data-min="15">15 хв</button>
-          </div>
-        </div>
-
-        <!-- Alert Sound & Volume -->
-        <div class="setting-group">
-          <label class="setting-label">Звуковий сигнал при перевищенні</label>
-          <div class="segmented-control" id="sound-control">
-            <button class="segmented-tab ${s.alertSound === 'shush' ? 'active' : ''}" data-sound="shush">
-              Шурхіт «Тссс»
-            </button>
-            <button class="segmented-tab ${s.alertSound === 'beep' ? 'active' : ''}" data-sound="beep">
-              Тон «Біп»
-            </button>
-            <button class="segmented-tab ${s.alertSound === 'none' ? 'active' : ''}" data-sound="none">
-              Вимкнено
-            </button>
-          </div>
-        </div>
-
-        <div class="setting-group">
-          <div class="slider-header">
-            <span>Гучність SFX</span>
-            <span class="slider-val" id="val-volume">${Math.round(s.volume * 100)}%</span>
-          </div>
-          <input type="range" class="slider" id="slider-volume" min="0" max="1" step="0.05" value="${s.volume}">
-        </div>
-
-        <!-- Classroom & Weekly Goal (Flattened section) -->
-        <div class="setting-group section-divider">
-          <label class="setting-label">Клас та тижнева ціль</label>
-          <div class="class-selector-row">
-            <div class="class-buttons" id="class-buttons-list">
-              ${Object.keys(this.state.classes).map(c => `
-                <button class="class-tab-btn ${c === activeClass ? 'active' : ''}" data-class="${c}">
-                  ${c}
-                </button>
-              `).join('')}
-            </div>
-            <button class="action-btn-small" id="btn-add-class" title="Додати клас">
-              ${iconPlus()} Клас
-            </button>
-          </div>
-
-          <div class="goal-reward-edit">
-            <div class="goal-input-wrap">
-              <span>Ціль:</span>
-              <input type="number" class="num-input" id="input-goal" min="5" max="100" value="${classData.goal}">
-              <span>зірок</span>
-              <button class="chip-btn-gold" id="btn-add-star" title="Нарахувати 1 зірку (S)">
-                +1 зірка
-              </button>
-            </div>
-            <div class="reward-input-wrap">
-              <span>Приз:</span>
-              <input type="text" class="text-input" id="input-reward" value="${classData.reward}" placeholder="5 хв мультика / гра">
-            </div>
-            <button class="action-btn-danger" id="btn-reset-week" title="Обнулити лічильник зірок обраного класу">
-              ${iconReset()} Скинути зірки на новий тиждень
-            </button>
-          </div>
         </div>
 
         <!-- Display Modes: Light Room & Fullscreen -->
@@ -325,13 +399,17 @@ export class TeacherPanel {
       this.callbacks.onBalls(val);
     });
 
-    // Volume Slider
+    // Volume Slider (with live audio preview on release!)
     const sVol = this.panel.querySelector('#slider-volume');
     const vVol = this.panel.querySelector('#val-volume');
     sVol?.addEventListener('input', () => {
       const val = parseFloat(sVol.value);
       vVol.textContent = `${Math.round(val * 100)}%`;
-      this.callbacks.onVolume(val);
+      this.callbacks.onVolume(val, false);
+    });
+    sVol?.addEventListener('change', () => {
+      const val = parseFloat(sVol.value);
+      this.callbacks.onVolume(val, true);
     });
 
     // Themes Grid
@@ -343,12 +421,27 @@ export class TeacherPanel {
       });
     });
 
-    // Alert Sound Control
+    // Alert Sound Control (Instant Preview on click!)
     this.panel.querySelectorAll('#sound-control .segmented-tab').forEach(tab => {
       tab.addEventListener('click', () => {
         this.panel.querySelectorAll('#sound-control .segmented-tab').forEach(t => t.classList.remove('active'));
         tab.classList.add('active');
-        this.callbacks.onSound(tab.dataset.sound);
+        this.callbacks.onSound(tab.dataset.sound, true);
+      });
+    });
+
+    // Dedicated Preview button
+    this.panel.querySelector('#btn-preview-sound')?.addEventListener('click', () => {
+      this.callbacks.onSound(this.state.settings.alertSound, true);
+    });
+
+    // Alert Repeat Interval Control
+    this.panel.querySelectorAll('#repeat-control .repeat-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        this.panel.querySelectorAll('#repeat-control .repeat-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        const sec = parseInt(tab.dataset.repeat, 10);
+        this.callbacks.onRepeatChange?.(sec);
       });
     });
 
@@ -362,23 +455,46 @@ export class TeacherPanel {
     // Class Tabs
     this.bindClassTabs();
 
-    // Add class button
-    this.panel.querySelector('#btn-add-class').addEventListener('click', () => {
-      const name = window.prompt('Введіть назву класу (наприклад: 5-В):');
-      if (name && name.trim()) {
-        const clean = name.trim();
-        if (this.callbacks.onAddClass) {
-          this.callbacks.onAddClass(clean);
-          this.refreshClassList();
-        }
+    // Add class inline input & button
+    const inputNewClass = this.panel.querySelector('#input-new-class');
+    const submitNewClass = () => {
+      const clean = (inputNewClass?.value || '').trim();
+      if (!clean) return;
+      if (this.callbacks.onAddClass) {
+        this.callbacks.onAddClass(clean);
+        inputNewClass.value = '';
+        this.refreshClassList();
+      }
+    };
+    this.panel.querySelector('#btn-add-class')?.addEventListener('click', submitNewClass);
+    inputNewClass?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        submitNewClass();
       }
     });
 
-    // Reset week button
-    this.panel.querySelector('#btn-reset-week').addEventListener('click', () => {
-      if (window.confirm('Скинути зірки та розпочати новий тиждень для цього класу?')) {
-        if (this.callbacks.onResetWeek) this.callbacks.onResetWeek();
+    // Delete class button
+    this.panel.querySelector('#btn-delete-class')?.addEventListener('click', () => {
+      const keys = Object.keys(this.state.classes);
+      if (keys.length <= 1) return;
+      const current = this.state.activeClass;
+      if (window.confirm(`Видалити «${current}» зі списку?`)) {
+        this.callbacks.onDeleteClass?.(current);
+        this.refreshClassList();
       }
+    });
+
+    // Manual +1 task completed button in stats strip
+    this.panel.querySelector('#btn-stat-add-task')?.addEventListener('click', () => {
+      this.callbacks.onAddTask?.();
+      this.updateClassStatsUI();
+    });
+
+    // Reset current stars button
+    this.panel.querySelector('#btn-reset-goal')?.addEventListener('click', () => {
+      this.callbacks.onResetGoal?.();
+      this.updateClassStatsUI();
     });
 
     // Add star manual
@@ -390,7 +506,9 @@ export class TeacherPanel {
     const inGoal = this.panel.querySelector('#input-goal');
     const inReward = this.panel.querySelector('#input-reward');
     const updateGoalReward = () => {
-      this.callbacks.onGoalChange(parseInt(inGoal.value, 10) || 20, inReward.value || 'Нагорода');
+      const nextGoal = Math.max(3, parseInt(inGoal.value, 10) || 20);
+      this.callbacks.onGoalChange(nextGoal, inReward.value || 'Нагорода');
+      this.updateClassStatsUI();
     };
     inGoal?.addEventListener('change', updateGoalReward);
     inReward?.addEventListener('change', updateGoalReward);
@@ -407,16 +525,9 @@ export class TeacherPanel {
   bindClassTabs() {
     this.panel.querySelectorAll('.class-tab-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        this.panel.querySelectorAll('.class-tab-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
         const className = btn.dataset.class;
         this.callbacks.onClassChange(className);
-
-        const cData = this.state.classes[className] || { stars: 0, goal: 20, reward: '5 хв мультика' };
-        const inGoal = this.panel.querySelector('#input-goal');
-        const inReward = this.panel.querySelector('#input-reward');
-        if (inGoal) inGoal.value = cData.goal;
-        if (inReward) inReward.value = cData.reward;
+        this.refreshClassList();
       });
     });
   }
@@ -426,7 +537,7 @@ export class TeacherPanel {
     if (!list) return;
     const activeClass = this.state.activeClass;
     list.innerHTML = Object.keys(this.state.classes).map(c => `
-      <button class="class-tab-btn ${c === activeClass ? 'active' : ''}" data-class="${c}">
+      <button class="liquid-glass-tab class-tab-btn ${c === activeClass ? 'active' : ''}" data-class="${c}">
         ${c}
       </button>
     `).join('');
@@ -437,12 +548,42 @@ export class TeacherPanel {
     const inReward = this.panel.querySelector('#input-reward');
     if (inGoal) inGoal.value = cData.goal;
     if (inReward) inReward.value = cData.reward;
+
+    const delBtn = this.panel.querySelector('#btn-delete-class');
+    if (delBtn) {
+      delBtn.style.opacity = Object.keys(this.state.classes).length > 1 ? '1' : '0.3';
+      delBtn.style.pointerEvents = Object.keys(this.state.classes).length > 1 ? 'auto' : 'none';
+    }
+
+    this.updateClassStatsUI();
+  }
+
+  updateClassStatsUI() {
+    const cData = this.state.classes[this.state.activeClass];
+    if (!cData) return;
+
+    const elTotalStars = this.panel.querySelector('#stat-total-stars');
+    const elTasks = this.panel.querySelector('#stat-tasks');
+    const elGoals = this.panel.querySelector('#stat-goals');
+    const elQuietMin = this.panel.querySelector('#stat-quiet-min');
+    const btnResetGoal = this.panel.querySelector('#btn-reset-goal');
+
+    if (elTotalStars) elTotalStars.textContent = cData.totalStars ?? cData.stars ?? 0;
+    if (elTasks) elTasks.textContent = cData.tasksCompleted ?? 0;
+    if (elGoals) elGoals.textContent = cData.goalsReached ?? 0;
+    if (elQuietMin) elQuietMin.textContent = `${Math.floor((cData.quietSeconds || 0) / 60)} хв`;
+    if (btnResetGoal) {
+      btnResetGoal.innerHTML = `${iconReset()} Скинути поточні зірки (${cData.stars || 0}/${cData.goal || 20})`;
+    }
   }
 
   toggle(force = null) {
     const isClosed = this.panel.classList.contains('closed');
     const nextClosed = force !== null ? !force : !isClosed;
     this.panel.classList.toggle('closed', nextClosed);
+    if (!nextClosed) {
+      this.updateClassStatsUI();
+    }
   }
 
   populateAudioDevices(devices, currentDeviceId = '') {
