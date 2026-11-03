@@ -262,6 +262,7 @@ export class TeacherPanel {
         <div class="panel-footer">
           <p class="privacy-text">${iconLock()} <span>${t('privacyNote')}</span></p>
           <p class="hotkeys-text">${t('hotkeysHelp')}</p>
+          <p class="hotkeys-text">Автор: <a href="https://sivochka.com/uk/tutoring/" target="_blank" rel="noopener" style="color:var(--ink);text-decoration:underline;">Ігор Сівочка — уроки IT та 3D ↗</a> • <a href="https://sivochka.com/" target="_blank" rel="noopener" style="color:var(--muted);">sivochka.com</a></p>
         </div>
       </div>
     `;

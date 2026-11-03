@@ -485,7 +485,7 @@ ${iconPlus()} Клас
 </button></div><div class="reward-input-wrap"><span>Приз:</span><input type="text" class="text-input" id="input-reward" value="${classData.reward}" placeholder="5 хв мультика / гра"></div><button class="action-btn-danger" id="btn-reset-week" title="Обнулити лічильник зірок обраного класу">
 ${iconReset()} Скинути зірки на новий тиждень
 </button></div></div><div class="setting-group section-divider"><label class="checkbox-label"><input type="checkbox" id="check-light-room" ${s.lightRoom ? 'checked' : ''}><span>Світлий режим (контраст для проектора)</span></label><button class="action-btn secondary full-width" id="btn-fullscreen">
-${iconFullscreen()} <span>Повний екран (F)</span></button></div><div class="panel-footer"><p class="privacy-text">${iconLock()} <span>${t('privacyNote')}</span></p><p class="hotkeys-text">${t('hotkeysHelp')}</p></div></div>
+${iconFullscreen()} <span>Повний екран (F)</span></button></div><div class="panel-footer"><p class="privacy-text">${iconLock()} <span>${t('privacyNote')}</span></p><p class="hotkeys-text">${t('hotkeysHelp')}</p><p class="hotkeys-text">Автор: <a href="https://sivochka.com/uk/tutoring/" target="_blank" rel="noopener" style="color:var(--ink);text-decoration:underline;">Ігор Сівочка — уроки IT та 3D ↗</a> • <a href="https://sivochka.com/" target="_blank" rel="noopener" style="color:var(--muted);">sivochka.com</a></p></div></div>
 `;
 }
 bindEvents() {
