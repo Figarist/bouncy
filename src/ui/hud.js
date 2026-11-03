@@ -10,19 +10,34 @@ import {
   iconReset,
   iconLock,
   iconGift,
+  iconTimer,
+  iconModeQuiet,
+  iconModeGroups,
+  iconModeBreak,
 } from './icons.js';
+import { openPopover, closePopover, escapeHtml } from './popover.js';
+
+const TIMER_MINUTES = [1, 2, 3, 5, 10, 15, 20];
+const MAX_TIMER_MINUTES = 90;
+
+const ZONE_LABELS = {
+  green: 'Тихо',
+  yellow: 'Шепіт',
+  red: 'Шумно!',
+};
 
 export class HUD {
   /**
    * @param {object} callbacks
    * @param {Function} callbacks.onModeChange
-   * @param {Function} callbacks.onClassChange
+   * @param {Function} callbacks.onTimerStart
+   * @param {Function} callbacks.onTimerCancel
    * @param {Function} callbacks.onQuickCalibrate
    * @param {Function} callbacks.onPanelToggle
    * @param {Function} callbacks.onTimerToggle
    * @param {Function} callbacks.onResetGoal
    */
-  constructor(callbacks = {}, initialClasses = {}, activeClass = '4-Б') {
+  constructor(callbacks = {}) {
     this.callbacks = callbacks;
     this.container = document.createElement('div');
     this.container.className = 'hud-container';
@@ -30,46 +45,51 @@ export class HUD {
     this.container.innerHTML = `
       <!-- Top Bar in TV Safe Area -->
       <div class="hud-top">
-        <!-- Left: Noise Traffic Light + Liquid Glass Quick Class Switcher -->
+        <!-- Left: Noise Traffic Light -->
         <div class="hud-left">
-          <div class="traffic-light-meter liquid-glass-surface" id="traffic-light">
+          <div class="traffic-light-meter liquid-glass-surface" id="traffic-light" title="Зелений — тихо, жовтий — шепіт, червоний — шумно">
             <div class="traffic-dots">
               <div class="light-dot green active" title="Тиша (зелена зона)"></div>
               <div class="light-dot yellow" title="Шепіт (жовта зона)"></div>
               <div class="light-dot red" title="Шум (червона зона)"></div>
             </div>
+            <span class="traffic-label zone-green" id="traffic-label">Тихо</span>
             <div class="sound-meter-wrap" id="sound-meter-wrap">
               <div class="meter-threshold-tick yellow-tick" title="Поріг жовтої зони"></div>
               <div class="meter-threshold-tick red-tick" title="Поріг червоної зони"></div>
               <div class="db-bar" id="db-bar"></div>
             </div>
-            <button class="hud-icon-btn" id="cal-quick-btn" title="${t('calibrateBtn')}">
+            <button class="hud-icon-btn" id="cal-quick-btn" title="Запам'ятати тишу в класі (3 с)">
               ${iconCalibrate()}
             </button>
-          </div>
-
-          <div class="hud-class-switcher liquid-glass-pillbar" id="hud-class-switcher" title="Швидкий вибір групи / потоку">
           </div>
         </div>
 
         <!-- Center: Interactive Liquid Glass Mode Switcher & Timer -->
         <div class="hud-center">
           <div class="mode-segmented-control liquid-glass-pillbar" id="hud-mode-control">
-            <button class="hud-mode-tab liquid-glass-tab active" data-mode="quiet">
-              <span>Тиха робота</span>
+            <button class="hud-mode-tab liquid-glass-tab active" data-mode="quiet" title="Найсуворіше. Зірки за тишу (клавіша 1)">
+              ${iconModeQuiet()}<span>Тиха робота</span>
             </button>
-            <button class="hud-mode-tab liquid-glass-tab" data-mode="groups">
-              <span>Групи</span>
+            <button class="hud-mode-tab liquid-glass-tab" data-mode="groups" title="Можна говорити впівголоса. Зірки теж є (клавіша 2)">
+              ${iconModeGroups()}<span>Групи</span>
             </button>
-            <button class="hud-mode-tab liquid-glass-tab" data-mode="breaktime">
-              <span>Перерва</span>
+            <button class="hud-mode-tab liquid-glass-tab" data-mode="breaktime" title="Кульки стрибають від голосу. Без зірок (клавіша 3)">
+              ${iconModeBreak()}<span>Перерва</span>
             </button>
           </div>
 
+          <button class="hud-timer-btn liquid-glass-surface" id="hud-timer-btn" title="Таймер завдання">
+            ${iconTimer()}<span>Таймер</span>
+          </button>
+
           <div class="timer-display liquid-glass-surface hidden" id="timer-display">
             <span class="timer-digits" id="timer-digits">05:00</span>
-            <button class="timer-btn" id="timer-toggle-btn">
+            <button class="timer-btn" id="timer-toggle-btn" title="Пауза / продовжити (T)">
               ${iconPause()}
+            </button>
+            <button class="timer-btn" id="timer-cancel-btn" title="Зупинити таймер">
+              ${iconClose()}
             </button>
           </div>
         </div>
@@ -87,6 +107,7 @@ export class HUD {
               </div>
             </div>
             <div class="jar-text-info">
+              <div class="jar-class-label" id="jar-class-label"></div>
               <div class="star-count-badge" id="star-count">
                 ${iconStar(true)} <span id="star-numbers">0/20</span>
               </div>
@@ -94,10 +115,16 @@ export class HUD {
             </div>
           </div>
 
-          <button class="panel-toggle-btn liquid-glass-surface" id="panel-toggle-btn" title="Налаштування (H)">
+          <button class="panel-toggle-btn liquid-glass-surface" id="panel-toggle-btn" title="Налаштування: мікрофон, звук, кульки (H)">
             ${iconGear()}
           </button>
         </div>
+      </div>
+
+      <!-- Big task timer the whole class can read -->
+      <div class="big-timer hidden" id="big-timer">
+        <div class="big-timer-digits" id="big-timer-digits">05:00</div>
+        <div class="big-timer-bar"><span id="big-timer-fill"></span></div>
       </div>
 
       <!-- Large Alert Banner -->
@@ -147,7 +174,13 @@ export class HUD {
     this.dotYellow = this.container.querySelector('.light-dot.yellow');
     this.dotRed = this.container.querySelector('.light-dot.red');
     this.dbBar = this.container.querySelector('#db-bar');
-    this.classSwitcher = this.container.querySelector('#hud-class-switcher');
+    this.timerBtn = this.container.querySelector('#hud-timer-btn');
+    this.jarClassLabel = this.container.querySelector('#jar-class-label');
+    this.trafficLabel = this.container.querySelector('#traffic-label');
+    this.bigTimer = this.container.querySelector('#big-timer');
+    this.bigTimerDigits = this.container.querySelector('#big-timer-digits');
+    this.bigTimerFill = this.container.querySelector('#big-timer-fill');
+    this.lastTrafficText = '';
     this.modeControl = this.container.querySelector('#hud-mode-control');
     this.timerDisplay = this.container.querySelector('#timer-display');
     this.timerDigits = this.container.querySelector('#timer-digits');
@@ -172,28 +205,47 @@ export class HUD {
     this.starRingFill.style.strokeDasharray = `${this.ringCircumference} ${this.ringCircumference}`;
     this.starRingFill.style.strokeDashoffset = this.ringCircumference;
 
-    this.renderClassSwitcher(initialClasses, activeClass);
     this.bindEvents();
   }
 
-  renderClassSwitcher(classesObj = {}, activeClass = '') {
-    if (!this.classSwitcher) return;
-    const names = Object.keys(classesObj);
-    this.classSwitcher.innerHTML = names.map((name) => {
-      const c = classesObj[name];
-      const tasksBadge = c?.tasksCompleted > 0 ? `<span class="hud-class-stat" title="Виконано завдань">✓${c.tasksCompleted}</span>` : '';
-      return `
-        <button class="hud-class-tab liquid-glass-tab ${name === activeClass ? 'active' : ''}" data-class="${name}">
-          <span>${name}</span>${tasksBadge}
-        </button>
-      `;
-    }).join('');
+  setClassName(name, color = '') {
+    this.jarClassLabel.textContent = name;
+    this.jarClassLabel.style.setProperty('--class-color', color || 'var(--ink)');
+  }
 
-    this.classSwitcher.querySelectorAll('.hud-class-tab').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const cls = btn.dataset.class;
-        this.callbacks.onClassChange?.(cls);
-      });
+  openTimerMenu() {
+    openPopover({
+      anchor: this.timerBtn,
+      side: 'below',
+      title: 'Таймер завдання',
+      width: 300,
+      html: `
+        <div class="timer-chips">
+          ${TIMER_MINUTES.map((m) => `<button class="chip-btn" data-min="${m}">${m} хв</button>`).join('')}
+        </div>
+        <form class="timer-custom" id="timer-custom">
+          <span class="field-label">Свій час:</span>
+          <input type="number" class="num-input" id="timer-custom-min" min="1" max="${MAX_TIMER_MINUTES}" value="7" inputmode="numeric">
+          <span class="field-label">хв</span>
+          <button type="submit" class="action-btn">Старт</button>
+        </form>
+        <p class="popover-note">Коли час вийде, класу зарахується виконане завдання. Якщо весь час було тихо — ще й бонусна зірка.</p>
+      `,
+      onMount: (el) => {
+        el.querySelectorAll('[data-min]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            closePopover();
+            this.callbacks.onTimerStart?.(parseInt(btn.dataset.min, 10));
+          });
+        });
+        el.querySelector('#timer-custom').addEventListener('submit', (e) => {
+          e.preventDefault();
+          const raw = parseInt(el.querySelector('#timer-custom-min').value, 10);
+          if (!raw) return;
+          closePopover();
+          this.callbacks.onTimerStart?.(Math.max(1, Math.min(MAX_TIMER_MINUTES, raw)));
+        });
+      },
     });
   }
 
@@ -219,6 +271,10 @@ export class HUD {
     this.timerToggleBtn.addEventListener('click', () => {
       if (this.callbacks.onTimerToggle) this.callbacks.onTimerToggle();
     });
+    this.timerBtn.addEventListener('click', () => this.openTimerMenu());
+    this.container.querySelector('#timer-cancel-btn').addEventListener('click', () => {
+      this.callbacks.onTimerCancel?.();
+    });
 
     this.container.querySelector('#toast-close-btn')?.addEventListener('click', () => {
       this.micBlockedToast.classList.add('hidden');
@@ -237,6 +293,13 @@ export class HUD {
     this.dotGreen.classList.toggle('active', zone === 'green');
     this.dotYellow.classList.toggle('active', zone === 'yellow');
     this.dotRed.classList.toggle('active', zone === 'red');
+
+    const labelText = isCalibrating ? 'Слухаю…' : ZONE_LABELS[zone] || ZONE_LABELS.green;
+    if (labelText !== this.lastTrafficText) {
+      this.lastTrafficText = labelText;
+      this.trafficLabel.textContent = labelText;
+      this.trafficLabel.className = `traffic-label zone-${isCalibrating ? 'yellow' : zone}`;
+    }
 
     if (isCalibrating) {
       this.dbBar.style.width = `${Math.round(calProgress * 100)}%`;
@@ -260,20 +323,36 @@ export class HUD {
     });
   }
 
-  updateTimer(remainingSeconds, isRunning) {
+  updateTimer(remainingSeconds, isRunning, totalSeconds = 0) {
     if (remainingSeconds <= 0 && !isRunning) {
       this.timerDisplay.classList.add('hidden');
-      this.modeControl.classList.remove('hidden');
+      this.bigTimer.classList.add('hidden');
+      this.timerBtn.classList.remove('hidden');
+      this.lastTimerState = null;
       return;
     }
 
     this.timerDisplay.classList.remove('hidden');
-    this.modeControl.classList.add('hidden');
+    this.bigTimer.classList.remove('hidden');
+    this.timerBtn.classList.add('hidden');
 
-    const m = Math.floor(remainingSeconds / 60);
-    const s = Math.floor(remainingSeconds % 60);
-    this.timerDigits.textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-    this.timerToggleBtn.innerHTML = isRunning ? iconPause() : iconPlay();
+    // Round up so the display never shows 00:00 while time is still left
+    const whole = Math.ceil(remainingSeconds);
+    const m = Math.floor(whole / 60);
+    const s = whole % 60;
+    const text = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    this.timerDigits.textContent = text;
+    this.bigTimerDigits.textContent = text;
+
+    const pct = totalSeconds > 0 ? Math.max(0, Math.min(100, (remainingSeconds / totalSeconds) * 100)) : 100;
+    this.bigTimerFill.style.width = `${pct}%`;
+    this.bigTimer.classList.toggle('paused', !isRunning);
+    this.bigTimer.classList.toggle('ending', isRunning && remainingSeconds <= 10);
+
+    if (this.lastTimerState !== isRunning) {
+      this.lastTimerState = isRunning;
+      this.timerToggleBtn.innerHTML = isRunning ? iconPause() : iconPlay();
+    }
   }
 
   updateStars(stars, goal, progress, isGolden, rewardText = '') {
@@ -323,7 +402,8 @@ export class HUD {
 
   showGoalReachedModal(rewardText, onResetGoal = null) {
     if (onResetGoal) this.callbacks.onResetGoal = onResetGoal;
-    this.goalModalReward.innerHTML = `${iconGift()} <span>${rewardText || 'Нагорода'}</span>`;
+    closePopover();
+    this.goalModalReward.innerHTML = `${iconGift()} <span>${escapeHtml(rewardText || 'Нагорода')}</span>`;
     this.goalModal.classList.remove('hidden');
   }
 

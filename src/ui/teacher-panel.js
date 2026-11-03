@@ -4,15 +4,19 @@ import {
   iconCalibrate,
   iconFullscreen,
   iconClose,
-  iconPlus,
-  iconTrash,
-  iconReset,
   iconLock,
   iconCamera,
   iconLaptop,
   iconVolume,
+  iconChevron,
+  iconPalette,
+  iconBell,
+  iconSun,
+  iconHelp,
+  iconSliders,
   getThemeCardIllustration,
 } from './icons.js';
+import { openPopover, getOpenPopover, escapeHtml } from './popover.js';
 
 const THEMES = [
   { id: 'craft', title: 'Крафт-Куби', sub: 'Піксель-світ' },
@@ -27,16 +31,51 @@ const THEMES = [
   { id: 'eyes', title: 'Очі', sub: 'Курсор' },
 ];
 
-const MODE_TECH_NOTES = {
-  quiet: 'Поріг: +4.5 / +9.0 dB • Нагорода: +1 зірка кожні 30 с тиші',
-  groups: 'Поріг: +8.0 / +15.0 dB • Робоче обговорення в групах',
-  breaktime: 'Поріг: +12.0 / +20.0 dB • Висота стрибка від гучності голосу',
-};
+const SOUNDS = [
+  { id: 'shush', title: 'Тссс!' },
+  { id: 'beep', title: 'Радар' },
+  { id: 'bell', title: 'Дзвоник' },
+  { id: 'arcade', title: 'Аркада' },
+  { id: 'none', title: 'Без звуку' },
+];
+
+const REPEATS = [
+  { sec: 2, title: 'Кожні 2 с' },
+  { sec: 4, title: 'Кожні 4 с' },
+  { sec: 8, title: 'Кожні 8 с' },
+  { sec: 0, title: '1 раз' },
+];
+
+const PROFILES = [
+  { id: 'webcam', title: 'Вебкамера', hint: 'Камера на дошці, 2–4 м від дітей', icon: () => iconCamera() },
+  { id: 'laptop', title: 'Ноутбук', hint: 'Вбудований мікрофон', icon: () => iconLaptop() },
+  { id: 'close', title: 'Гарнітура', hint: 'Мікрофон поруч із вчителем', icon: () => iconMic(true) },
+];
+
+const HOTKEYS = [
+  ['H', 'Відкрити / закрити налаштування'],
+  ['1 / 2 / 3', 'Тиха робота / Групи / Перерва'],
+  ['S', '+1 зірка активному класу'],
+  ['T', 'Пауза / продовжити таймер'],
+  ['C', 'Калібрувати тишу (3 с)'],
+  ['M', 'Мікрофон увімк. / вимк.'],
+  ['F', 'Повний екран'],
+  ['Space', 'Зупинити кульки'],
+];
+
+function sensitivityLabel(val) {
+  if (val === 0) return 'Звичайна';
+  if (val > 0) return `Суворіше +${val}`;
+  return `М'якше ${val}`;
+}
 
 export class TeacherPanel {
   constructor(state, callbacks) {
     this.state = state;
     this.callbacks = callbacks;
+    this.isListening = false;
+    this.isCalibrating = false;
+    this.devices = [];
 
     this.panel = document.createElement('div');
     this.panel.className = 'teacher-panel closed';
@@ -46,651 +85,449 @@ export class TeacherPanel {
     this.bindEvents();
   }
 
+  /** Finds an element in the panel or in the popover it opened. */
+  $(selector) {
+    return this.panel.querySelector(selector) || getOpenPopover()?.querySelector(selector) || null;
+  }
+
   render() {
     const s = this.state.settings;
-    const activeClass = this.state.activeClass;
-    const classData = this.state.classes[activeClass] || {
-      stars: 0,
-      goal: 20,
-      reward: '5 хв мультика',
-      totalStars: 0,
-      tasksCompleted: 0,
-      cleanTasks: 0,
-      goalsReached: 0,
-      quietSeconds: 0,
-    };
-    const repeatSec = s.alertRepeatSec ?? 4;
 
     this.panel.innerHTML = `
       <div class="panel-header">
-        <h2>Панель вчителя</h2>
+        <h2>Налаштування</h2>
         <button class="panel-close-btn" id="btn-close-panel" title="Закрити (H)">
           ${iconClose()}
         </button>
       </div>
 
       <div class="panel-body">
-        <!-- Lesson Mode Presets (Liquid Glass Segmented Control) -->
-        <div class="setting-group">
-          <label class="setting-label">Режим уроку</label>
-          <div class="liquid-glass-pillbar panel-pillbar" id="panel-mode-grid">
-            <button class="liquid-glass-tab mode-card-btn ${s.mode === 'quiet' ? 'active' : ''}" data-mode="quiet">
-              Тиха робота
-            </button>
-            <button class="liquid-glass-tab mode-card-btn ${s.mode === 'groups' ? 'active' : ''}" data-mode="groups">
-              Групи
-            </button>
-            <button class="liquid-glass-tab mode-card-btn ${s.mode === 'breaktime' ? 'active' : ''}" data-mode="breaktime">
-              Перерва
-            </button>
+        <!-- 1. Microphone: the only thing that must work before the lesson -->
+        <section class="panel-card">
+          <div class="panel-card-head">
+            <span class="panel-card-title">Мікрофон</span>
+            <span class="mic-pill" id="mic-pill">Вимкнено</span>
           </div>
-          <div class="mode-tech-hint" id="mode-tech-desc">${MODE_TECH_NOTES[s.mode] || MODE_TECH_NOTES.quiet}</div>
-        </div>
-
-        <!-- Theme Selection Grid (Kids' favorites first!) -->
-        <div class="setting-group section-divider">
-          <label class="setting-label">Тема кульок</label>
-          <div class="themes-grid" id="themes-grid">
-            ${THEMES.map(th => `
-              <button class="theme-card ${s.theme === th.id ? 'active' : ''}" data-theme="${th.id}">
-                <div class="theme-card-icon">${getThemeCardIllustration(th.id)}</div>
-                <div class="theme-card-info">
-                  <span class="theme-title">${th.title}</span>
-                  <span class="theme-sub">${th.sub}</span>
-                </div>
-              </button>
-            `).join('')}
+          <div class="mini-meter" title="Як голосно зараз у класі">
+            <div class="mini-meter-fill" id="mini-meter-fill"></div>
           </div>
-        </div>
-
-        <!-- Alert Sound, Preview & Repeat Interval -->
-        <div class="setting-group section-divider">
-          <div class="slider-header">
-            <label class="setting-label">Звуковий сигнал (клік = прослухати)</label>
-            <button class="preview-sound-btn" id="btn-preview-sound" title="Прослухати поточний сигнал">
-              ${iconVolume()} Тест
-            </button>
-          </div>
-          <div class="liquid-glass-pillbar panel-pillbar" id="sound-control">
-            <button class="liquid-glass-tab segmented-tab ${s.alertSound === 'shush' ? 'active' : ''}" data-sound="shush">
-              Тссс!
-            </button>
-            <button class="liquid-glass-tab segmented-tab ${s.alertSound === 'beep' ? 'active' : ''}" data-sound="beep">
-              Радар
-            </button>
-            <button class="liquid-glass-tab segmented-tab ${s.alertSound === 'bell' ? 'active' : ''}" data-sound="bell">
-              Дзвоник
-            </button>
-            <button class="liquid-glass-tab segmented-tab ${s.alertSound === 'arcade' ? 'active' : ''}" data-sound="arcade">
-              Аркада
-            </button>
-            <button class="liquid-glass-tab segmented-tab ${s.alertSound === 'none' ? 'active' : ''}" data-sound="none">
-              Вимк.
-            </button>
-          </div>
-
-          <div class="repeat-interval-row">
-            <span class="sub-label">Повторювати сигнал, доки триває шум:</span>
-            <div class="liquid-glass-pillbar panel-pillbar" id="repeat-control">
-              <button class="liquid-glass-tab repeat-tab ${repeatSec === 2 ? 'active' : ''}" data-repeat="2">
-                Кожні 2 с
-              </button>
-              <button class="liquid-glass-tab repeat-tab ${repeatSec === 4 ? 'active' : ''}" data-repeat="4">
-                Кожні 4 с
-              </button>
-              <button class="liquid-glass-tab repeat-tab ${repeatSec === 8 ? 'active' : ''}" data-repeat="8">
-                Кожні 8 с
-              </button>
-              <button class="liquid-glass-tab repeat-tab ${repeatSec === 0 ? 'active' : ''}" data-repeat="0">
-                1 раз
-              </button>
-            </div>
-          </div>
-
-          <div class="slider-header" style="margin-top: 4px;">
-            <span>Гучність SFX (підсилена)</span>
-            <span class="slider-val" id="val-volume">${Math.round(s.volume * 100)}%</span>
-          </div>
-          <input type="range" class="slider" id="slider-volume" min="0" max="1.2" step="0.05" value="${s.volume}">
-        </div>
-
-        <!-- Class Manager, Statistics & Goal (No 'Weekly' or 'Class' label clutter) -->
-        <div class="setting-group section-divider">
-          <div class="slider-header">
-            <label class="setting-label">Менеджер груп та Ціль</label>
-            <button class="icon-danger-btn" id="btn-delete-class" title="Видалити поточний запис">
-              ${iconTrash()}
-            </button>
-          </div>
-
-          <div class="class-selector-row">
-            <div class="liquid-glass-pillbar class-buttons" id="class-buttons-list">
-              ${Object.keys(this.state.classes).map(c => `
-                <button class="liquid-glass-tab class-tab-btn ${c === activeClass ? 'active' : ''}" data-class="${c}">
-                  ${c}
-                </button>
-              `).join('')}
-            </div>
-          </div>
-
-          <div class="class-add-inline">
-            <input type="text" class="text-input" id="input-new-class" maxlength="14" placeholder="Новий (напр. 5-А, Група 2)">
-            <button class="action-btn-small" id="btn-add-class" title="Додати у список">
-              ${iconPlus()} Додати
-            </button>
-          </div>
-
-          <!-- Class Statistics Telemetry Strip -->
-          <div class="class-stats-strip" id="class-stats-strip">
-            <div class="stat-cell">
-              <span class="stat-val" id="stat-total-stars">${classData.totalStars || classData.stars || 0}</span>
-              <span class="stat-lbl">Усього зірок</span>
-            </div>
-            <div class="stat-cell stat-cell-interactive" id="btn-stat-add-task" title="Натисніть, щоб зарахувати +1 виконане завдання">
-              <div class="stat-val-row">
-                <span class="stat-val" id="stat-tasks">${classData.tasksCompleted || 0}</span>
-                <span class="stat-plus-badge">+1</span>
-              </div>
-              <span class="stat-lbl">Завдань</span>
-            </div>
-            <div class="stat-cell">
-              <span class="stat-val" id="stat-goals">${classData.goalsReached || 0}</span>
-              <span class="stat-lbl">Призів</span>
-            </div>
-            <div class="stat-cell">
-              <span class="stat-val" id="stat-quiet-min">${Math.floor((classData.quietSeconds || 0) / 60)} хв</span>
-              <span class="stat-lbl">Час тиші</span>
-            </div>
-          </div>
-
-          <div class="goal-reward-edit">
-            <div class="goal-input-wrap">
-              <span>Ціль:</span>
-              <input type="number" class="num-input" id="input-goal" min="3" max="200" value="${classData.goal}">
-              <span>зірок</span>
-              <button class="chip-btn-gold" id="btn-add-star" title="Нарахувати +1 зірку (S)">
-                +1 зірка
-              </button>
-            </div>
-            <div class="reward-input-wrap">
-              <span>Приз:</span>
-              <input type="text" class="text-input" id="input-reward" value="${classData.reward}" placeholder="5 хв мультика / гра">
-            </div>
-            <button class="action-btn-danger" id="btn-reset-goal" title="Обнулити поточну банку зірок для нової цілі (загальна статистика зберігається)">
-              ${iconReset()} Скинути поточні зірки (0/${classData.goal})
-            </button>
-          </div>
-        </div>
-
-        <!-- Task Timer -->
-        <div class="setting-group section-divider">
-          <label class="setting-label">Таймер завдання (+1 у статистику після завершення)</label>
-          <div class="timer-chips">
-            <button class="chip-btn" data-min="1">1 хв</button>
-            <button class="chip-btn" data-min="2">2 хв</button>
-            <button class="chip-btn" data-min="5">5 хв</button>
-            <button class="chip-btn" data-min="10">10 хв</button>
-            <button class="chip-btn" data-min="15">15 хв</button>
-          </div>
-        </div>
-
-        <!-- Microphone & Hardware Adaptation -->
-        <div class="setting-group section-divider">
-          <label class="setting-label">Мікрофон та DSP-тракт</label>
           <div class="btn-row">
             <button class="action-btn" id="btn-toggle-mic">
-              ${iconMic(false)} <span>Увімк. мікрофон</span>
+              ${iconMic(true)} <span>Увімкнути</span>
             </button>
-            <button class="action-btn secondary" id="btn-calibrate">
-              ${iconCalibrate()} <span>Калібрувати (3с)</span>
+            <button class="action-btn secondary" id="btn-calibrate" title="Попросіть клас помовчати 3 секунди">
+              ${iconCalibrate()} <span>Запам'ятати тишу</span>
             </button>
           </div>
+          <button class="row-link" id="row-mic-advanced">
+            ${iconSliders()} <span>Який мікрофон і підсилення</span> ${iconChevron('right')}
+          </button>
+        </section>
 
-          <div class="mic-device-row">
-            <label class="sub-label" for="select-mic-device">Пристрій вводу:</label>
-            <select class="select-input" id="select-mic-device">
-              <option value="">Системний за замовчуванням</option>
-            </select>
-          </div>
-
-          <div class="mic-profiles-group">
-            <span class="sub-label">Профіль обладнання (HPF + Presence):</span>
-            <div class="liquid-glass-pillbar panel-pillbar">
-              <button class="liquid-glass-tab profile-chip-btn ${s.micProfile === 'webcam' ? 'active' : ''}" data-profile="webcam" title="120 Hz HPF + 2.2 kHz (+3.5 dB) + Gain 2.2x">
-                ${iconCamera()} <span>Вебкамера</span>
-              </button>
-              <button class="liquid-glass-tab profile-chip-btn ${s.micProfile === 'laptop' ? 'active' : ''}" data-profile="laptop" title="100 Hz HPF + 2.0 kHz (+2.0 dB) + Gain 1.5x">
-                ${iconLaptop()} <span>Ноутбук</span>
-              </button>
-              <button class="liquid-glass-tab profile-chip-btn ${s.micProfile === 'close' ? 'active' : ''}" data-profile="close" title="80 Hz HPF + прямий сигнал 1.0x">
-                ${iconMic(true)} <span>Гарнітура</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- Live Signal VU-Meter Telemetry -->
-          <div class="mic-test-wrap">
-            <div class="mic-test-header">
-              <span>Рівень сигналу (RMS):</span>
-              <span id="mic-test-db">Вимк.</span>
-            </div>
-            <div class="mic-vu-bar-bg">
-              <div class="mic-vu-bar-fill" id="mic-vu-fill"></div>
-              <div class="mic-vu-tick yellow-tick" title="Поріг жовтої зони"></div>
-              <div class="mic-vu-tick red-tick" title="Поріг червоної зони"></div>
-            </div>
-            <div class="mic-status-hint" id="mic-status-hint">
-              <span>Фон: <strong id="hint-ambient">${Math.round(s.ambientBaselineDb || -55)} dB</strong></span>
-              <span>•</span>
-              <span id="hint-status">Мікрофон вимкнено</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Sliders: Gain, Sensitivity, Balls -->
-        <div class="setting-group">
+        <!-- 2. Sensitivity -->
+        <section class="panel-card">
           <div class="slider-header">
-            <span>Підсилення (Preamp Gain)</span>
-            <span class="slider-val" id="val-gain">${s.micGain ? Number(s.micGain).toFixed(1) : '2.2'}×</span>
-          </div>
-          <input type="range" class="slider" id="slider-gain" min="0.5" max="4.5" step="0.1" value="${s.micGain || 2.2}">
-          <div class="slider-hints">
-            <span>0.5×</span>
-            <span>2.2× (вебкамера)</span>
-            <span>4.5×</span>
-          </div>
-        </div>
-
-        <div class="setting-group">
-          <div class="slider-header">
-            <span>Зміщення порогів (Чутливість)</span>
-            <span class="slider-val" id="val-sensitivity">${s.sensitivity > 0 ? '+' : ''}${s.sensitivity} dB</span>
+            <span class="panel-card-title">Чутливість до шуму</span>
+            <span class="slider-val" id="val-sensitivity">${sensitivityLabel(s.sensitivity)}</span>
           </div>
           <input type="range" class="slider" id="slider-sensitivity" min="-15" max="15" step="1" value="${s.sensitivity}">
           <div class="slider-hints">
-            <span>-15 dB (грубіше)</span>
-            <span>0 dB</span>
-            <span>+15 dB (чутливіше)</span>
+            <span>Дозволяє шуміти</span>
+            <span>Реагує на шепіт</span>
           </div>
-        </div>
+        </section>
 
-        <div class="setting-group">
-          <div class="slider-header">
-            <span>Кількість кульок</span>
-            <span class="slider-val" id="val-balls">${s.balls}</span>
-          </div>
-          <input type="range" class="slider" id="slider-balls" min="10" max="150" step="5" value="${s.balls}">
-        </div>
-
-        <!-- Display Modes: Light Room & Fullscreen -->
-        <div class="setting-group section-divider">
-          <label class="checkbox-label">
-            <input type="checkbox" id="check-light-room" ${s.lightRoom ? 'checked' : ''}>
-            <span>Світлий режим (контраст для проектора)</span>
-          </label>
-          <button class="action-btn secondary full-width" id="btn-fullscreen">
-            ${iconFullscreen()} <span>Повний екран (F)</span>
+        <!-- 3. Everything else: one-line rows that open a popover -->
+        <section class="panel-list">
+          <button class="list-row" id="row-theme">
+            <span class="list-row-icon">${iconPalette()}</span>
+            <span class="list-row-text">
+              <span class="list-row-title">Кульки</span>
+              <span class="list-row-value" id="row-theme-value">${this.themeSummary()}</span>
+            </span>
+            ${iconChevron('right')}
           </button>
-        </div>
+
+          <button class="list-row" id="row-sound">
+            <span class="list-row-icon">${iconBell()}</span>
+            <span class="list-row-text">
+              <span class="list-row-title">Сигнал, коли шумно</span>
+              <span class="list-row-value" id="row-sound-value">${this.soundSummary()}</span>
+            </span>
+            ${iconChevron('right')}
+          </button>
+
+          <label class="list-row">
+            <span class="list-row-icon">${iconSun()}</span>
+            <span class="list-row-text">
+              <span class="list-row-title">Світлий екран</span>
+              <span class="list-row-value">Для яскравого проектора</span>
+            </span>
+            <input type="checkbox" class="switch" id="check-light-room" ${s.lightRoom ? 'checked' : ''}>
+          </label>
+
+          <button class="list-row" id="btn-fullscreen">
+            <span class="list-row-icon">${iconFullscreen()}</span>
+            <span class="list-row-text">
+              <span class="list-row-title">Повний екран</span>
+              <span class="list-row-value">Клавіша F</span>
+            </span>
+          </button>
+
+          <button class="list-row" id="row-help">
+            <span class="list-row-icon">${iconHelp()}</span>
+            <span class="list-row-text">
+              <span class="list-row-title">Як це працює</span>
+              <span class="list-row-value">Підказки та клавіші</span>
+            </span>
+            ${iconChevron('right')}
+          </button>
+        </section>
 
         <div class="panel-footer">
           <p class="privacy-text">${iconLock()} <span>${t('privacyNote')}</span></p>
-          <p class="hotkeys-text">${t('hotkeysHelp')}</p>
-          <p class="hotkeys-text">Автор: <a href="https://sivochka.com/uk/tutoring/" target="_blank" rel="noopener" style="color:var(--ink);text-decoration:underline;">Ігор Сівочка — уроки IT та 3D ↗</a> • <a href="https://sivochka.com/" target="_blank" rel="noopener" style="color:var(--muted);">sivochka.com</a></p>
+          <p class="hotkeys-text">Автор: <a href="https://sivochka.com/uk/tutoring/" target="_blank" rel="noopener">Ігор Сівочка — уроки IT та 3D ↗</a></p>
         </div>
       </div>
     `;
   }
 
+  themeSummary() {
+    const th = THEMES.find((x) => x.id === this.state.settings.theme) || THEMES[0];
+    return `${th.title} · ${this.state.settings.balls} шт.`;
+  }
+
+  soundSummary() {
+    const s = this.state.settings;
+    const sound = SOUNDS.find((x) => x.id === s.alertSound) || SOUNDS[0];
+    if (sound.id === 'none') return sound.title;
+    const repeat = REPEATS.find((r) => r.sec === (s.alertRepeatSec ?? 4)) || REPEATS[1];
+    return `${sound.title} · ${repeat.title.toLowerCase()} · ${Math.round(s.volume * 100)}%`;
+  }
+
   bindEvents() {
     this.panel.querySelector('#btn-close-panel').addEventListener('click', () => this.toggle(false));
-
-    // Mode buttons
-    this.panel.querySelectorAll('.mode-card-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        this.setModeState(btn.dataset.mode);
-        this.callbacks.onModeChange(btn.dataset.mode);
-      });
-    });
-
-    // Mic & Calibrate
     this.panel.querySelector('#btn-toggle-mic').addEventListener('click', () => this.callbacks.onMicToggle());
     this.panel.querySelector('#btn-calibrate').addEventListener('click', () => this.callbacks.onCalibrate());
 
-    // Mic device select
-    const micSel = this.panel.querySelector('#select-mic-device');
-    micSel?.addEventListener('change', () => {
-      this.callbacks.onDeviceChange?.(micSel.value);
-    });
-
-    // Mic profiles
-    this.panel.querySelectorAll('.profile-chip-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        this.panel.querySelectorAll('.profile-chip-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        this.callbacks.onProfileChange?.(btn.dataset.profile);
-      });
-    });
-
-    // Preamp Gain Slider
-    const sGain = this.panel.querySelector('#slider-gain');
-    const vGain = this.panel.querySelector('#val-gain');
-    sGain?.addEventListener('input', () => {
-      const val = parseFloat(sGain.value);
-      vGain.textContent = `${val.toFixed(1)}×`;
-      this.callbacks.onGainChange?.(val);
-    });
-
-    // Sensitivity Slider
     const sSens = this.panel.querySelector('#slider-sensitivity');
     const vSens = this.panel.querySelector('#val-sensitivity');
-    sSens?.addEventListener('input', () => {
+    sSens.addEventListener('input', () => {
       const val = parseInt(sSens.value, 10);
-      vSens.textContent = `${val > 0 ? '+' : ''}${val} dB`;
+      vSens.textContent = sensitivityLabel(val);
       this.callbacks.onSensitivity(val);
     });
 
-    // Balls Slider
-    const sBalls = this.panel.querySelector('#slider-balls');
-    const vBalls = this.panel.querySelector('#val-balls');
-    sBalls?.addEventListener('input', () => {
-      const val = parseInt(sBalls.value, 10);
-      vBalls.textContent = val;
-      this.callbacks.onBalls(val);
-    });
+    this.panel.querySelector('#row-mic-advanced').addEventListener('click', (e) => this.openMicPopover(e.currentTarget));
+    this.panel.querySelector('#row-theme').addEventListener('click', (e) => this.openThemePopover(e.currentTarget));
+    this.panel.querySelector('#row-sound').addEventListener('click', (e) => this.openSoundPopover(e.currentTarget));
+    this.panel.querySelector('#row-help').addEventListener('click', (e) => this.openHelpPopover(e.currentTarget));
 
-    // Volume Slider (with live audio preview on release!)
-    const sVol = this.panel.querySelector('#slider-volume');
-    const vVol = this.panel.querySelector('#val-volume');
-    sVol?.addEventListener('input', () => {
-      const val = parseFloat(sVol.value);
-      vVol.textContent = `${Math.round(val * 100)}%`;
-      this.callbacks.onVolume(val, false);
-    });
-    sVol?.addEventListener('change', () => {
-      const val = parseFloat(sVol.value);
-      this.callbacks.onVolume(val, true);
-    });
-
-    // Themes Grid
-    this.panel.querySelectorAll('.theme-card').forEach(card => {
-      card.addEventListener('click', () => {
-        this.panel.querySelectorAll('.theme-card').forEach(c => c.classList.remove('active'));
-        card.classList.add('active');
-        this.callbacks.onTheme(card.dataset.theme);
-      });
-    });
-
-    // Alert Sound Control (Instant Preview on click!)
-    this.panel.querySelectorAll('#sound-control .segmented-tab').forEach(tab => {
-      tab.addEventListener('click', () => {
-        this.panel.querySelectorAll('#sound-control .segmented-tab').forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
-        this.callbacks.onSound(tab.dataset.sound, true);
-      });
-    });
-
-    // Dedicated Preview button
-    this.panel.querySelector('#btn-preview-sound')?.addEventListener('click', () => {
-      this.callbacks.onSound(this.state.settings.alertSound, true);
-    });
-
-    // Alert Repeat Interval Control
-    this.panel.querySelectorAll('#repeat-control .repeat-tab').forEach(tab => {
-      tab.addEventListener('click', () => {
-        this.panel.querySelectorAll('#repeat-control .repeat-tab').forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
-        const sec = parseInt(tab.dataset.repeat, 10);
-        this.callbacks.onRepeatChange?.(sec);
-      });
-    });
-
-    // Timers
-    this.panel.querySelectorAll('.chip-btn[data-min]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        this.callbacks.onTimerStart(parseInt(btn.dataset.min, 10));
-      });
-    });
-
-    // Class Tabs
-    this.bindClassTabs();
-
-    // Add class inline input & button
-    const inputNewClass = this.panel.querySelector('#input-new-class');
-    const submitNewClass = () => {
-      const clean = (inputNewClass?.value || '').trim();
-      if (!clean) return;
-      if (this.callbacks.onAddClass) {
-        this.callbacks.onAddClass(clean);
-        inputNewClass.value = '';
-        this.refreshClassList();
-      }
-    };
-    this.panel.querySelector('#btn-add-class')?.addEventListener('click', submitNewClass);
-    inputNewClass?.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        submitNewClass();
-      }
-    });
-
-    // Delete class button
-    this.panel.querySelector('#btn-delete-class')?.addEventListener('click', () => {
-      const keys = Object.keys(this.state.classes);
-      if (keys.length <= 1) return;
-      const current = this.state.activeClass;
-      if (window.confirm(`Видалити «${current}» зі списку?`)) {
-        this.callbacks.onDeleteClass?.(current);
-        this.refreshClassList();
-      }
-    });
-
-    // Manual +1 task completed button in stats strip
-    this.panel.querySelector('#btn-stat-add-task')?.addEventListener('click', () => {
-      this.callbacks.onAddTask?.();
-      this.updateClassStatsUI();
-    });
-
-    // Reset current stars button
-    this.panel.querySelector('#btn-reset-goal')?.addEventListener('click', () => {
-      this.callbacks.onResetGoal?.();
-      this.updateClassStatsUI();
-    });
-
-    // Add star manual
-    this.panel.querySelector('#btn-add-star').addEventListener('click', () => {
-      this.callbacks.onAddStar();
-    });
-
-    // Goal & Reward changes
-    const inGoal = this.panel.querySelector('#input-goal');
-    const inReward = this.panel.querySelector('#input-reward');
-    const updateGoalReward = () => {
-      const nextGoal = Math.max(3, parseInt(inGoal.value, 10) || 20);
-      this.callbacks.onGoalChange(nextGoal, inReward.value || 'Нагорода');
-      this.updateClassStatsUI();
-    };
-    inGoal?.addEventListener('change', updateGoalReward);
-    inReward?.addEventListener('change', updateGoalReward);
-
-    // Light Room & Fullscreen
-    this.panel.querySelector('#check-light-room')?.addEventListener('change', (e) => {
+    this.panel.querySelector('#check-light-room').addEventListener('change', (e) => {
       this.callbacks.onLightRoom(e.target.checked);
     });
-    this.panel.querySelector('#btn-fullscreen')?.addEventListener('click', () => {
-      this.callbacks.onFullscreen();
+    this.panel.querySelector('#btn-fullscreen').addEventListener('click', () => this.callbacks.onFullscreen());
+  }
+
+  // ---------------------------------------------------------------------------
+  // Popovers
+  // ---------------------------------------------------------------------------
+
+  openThemePopover(anchor) {
+    const s = this.state.settings;
+    openPopover({
+      anchor,
+      side: 'left',
+      title: 'Кульки',
+      width: 380,
+      html: `
+        <div class="themes-grid">
+          ${THEMES.map((th) => `
+            <button class="theme-card ${s.theme === th.id ? 'active' : ''}" data-theme="${th.id}">
+              <div class="theme-card-icon">${getThemeCardIllustration(th.id)}</div>
+              <div class="theme-card-info">
+                <span class="theme-title">${th.title}</span>
+                <span class="theme-sub">${th.sub}</span>
+              </div>
+            </button>
+          `).join('')}
+        </div>
+        <div class="slider-header">
+          <span class="field-label">Скільки кульок</span>
+          <span class="slider-val" id="val-balls">${s.balls}</span>
+        </div>
+        <input type="range" class="slider" id="slider-balls" min="10" max="150" step="5" value="${s.balls}">
+      `,
+      onMount: (el) => {
+        el.querySelectorAll('.theme-card').forEach((card) => {
+          card.addEventListener('click', () => {
+            el.querySelectorAll('.theme-card').forEach((c) => c.classList.toggle('active', c === card));
+            this.callbacks.onTheme(card.dataset.theme);
+            this.refreshSummaries();
+          });
+        });
+        const sBalls = el.querySelector('#slider-balls');
+        const vBalls = el.querySelector('#val-balls');
+        sBalls.addEventListener('input', () => {
+          const val = parseInt(sBalls.value, 10);
+          vBalls.textContent = val;
+          this.callbacks.onBalls(val);
+          this.refreshSummaries();
+        });
+      },
     });
   }
 
-  bindClassTabs() {
-    this.panel.querySelectorAll('.class-tab-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const className = btn.dataset.class;
-        this.callbacks.onClassChange(className);
-        this.refreshClassList();
-      });
+  openSoundPopover(anchor) {
+    const s = this.state.settings;
+    const repeatSec = s.alertRepeatSec ?? 4;
+    openPopover({
+      anchor,
+      side: 'left',
+      title: 'Сигнал, коли шумно',
+      html: `
+        <span class="field-label">Звук (натисніть, щоб почути)</span>
+        <div class="choice-grid" id="sound-control">
+          ${SOUNDS.map((x) => `
+            <button class="choice-btn ${s.alertSound === x.id ? 'active' : ''}" data-sound="${x.id}">${x.title}</button>
+          `).join('')}
+        </div>
+
+        <span class="field-label">Повторювати, поки шумно</span>
+        <div class="liquid-glass-pillbar panel-pillbar" id="repeat-control">
+          ${REPEATS.map((r) => `
+            <button class="liquid-glass-tab ${repeatSec === r.sec ? 'active' : ''}" data-repeat="${r.sec}">${r.title}</button>
+          `).join('')}
+        </div>
+
+        <div class="slider-header">
+          <span class="field-label">Гучність</span>
+          <span class="slider-val" id="val-volume">${Math.round(s.volume * 100)}%</span>
+        </div>
+        <input type="range" class="slider" id="slider-volume" min="0" max="1.2" step="0.05" value="${s.volume}">
+        <button class="action-btn secondary full-width" id="btn-preview-sound">${iconVolume()} <span>Прослухати</span></button>
+      `,
+      onMount: (el) => {
+        el.querySelectorAll('[data-sound]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            el.querySelectorAll('[data-sound]').forEach((b) => b.classList.toggle('active', b === btn));
+            this.callbacks.onSound(btn.dataset.sound, true);
+            this.refreshSummaries();
+          });
+        });
+        el.querySelectorAll('[data-repeat]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            el.querySelectorAll('[data-repeat]').forEach((b) => b.classList.toggle('active', b === btn));
+            this.callbacks.onRepeatChange?.(parseInt(btn.dataset.repeat, 10));
+            this.refreshSummaries();
+          });
+        });
+        const sVol = el.querySelector('#slider-volume');
+        const vVol = el.querySelector('#val-volume');
+        sVol.addEventListener('input', () => {
+          const val = parseFloat(sVol.value);
+          vVol.textContent = `${Math.round(val * 100)}%`;
+          this.callbacks.onVolume(val, false);
+          this.refreshSummaries();
+        });
+        sVol.addEventListener('change', () => this.callbacks.onVolume(parseFloat(sVol.value), true));
+        el.querySelector('#btn-preview-sound').addEventListener('click', () => {
+          this.callbacks.onSound(this.state.settings.alertSound, true);
+        });
+      },
     });
   }
 
-  refreshClassList() {
-    const list = this.panel.querySelector('#class-buttons-list');
-    if (!list) return;
-    const activeClass = this.state.activeClass;
-    list.innerHTML = Object.keys(this.state.classes).map(c => `
-      <button class="liquid-glass-tab class-tab-btn ${c === activeClass ? 'active' : ''}" data-class="${c}">
-        ${c}
-      </button>
-    `).join('');
-    this.bindClassTabs();
+  openMicPopover(anchor) {
+    const s = this.state.settings;
+    const gain = s.micGain ? Number(s.micGain) : 2.2;
+    openPopover({
+      anchor,
+      side: 'left',
+      title: 'Мікрофон',
+      width: 340,
+      html: `
+        <label class="field">
+          <span class="field-label">Пристрій</span>
+          <select class="select-input" id="select-mic-device"></select>
+        </label>
 
-    const cData = this.state.classes[activeClass] || { stars: 0, goal: 20, reward: '5 хв мультика' };
-    const inGoal = this.panel.querySelector('#input-goal');
-    const inReward = this.panel.querySelector('#input-reward');
-    if (inGoal) inGoal.value = cData.goal;
-    if (inReward) inReward.value = cData.reward;
+        <span class="field-label">Де стоїть мікрофон</span>
+        <div class="profile-list">
+          ${PROFILES.map((p) => `
+            <button class="profile-row profile-chip-btn ${s.micProfile === p.id ? 'active' : ''}" data-profile="${p.id}">
+              ${p.icon()}
+              <span><b>${p.title}</b><small>${p.hint}</small></span>
+            </button>
+          `).join('')}
+        </div>
 
-    const delBtn = this.panel.querySelector('#btn-delete-class');
-    if (delBtn) {
-      delBtn.style.opacity = Object.keys(this.state.classes).length > 1 ? '1' : '0.3';
-      delBtn.style.pointerEvents = Object.keys(this.state.classes).length > 1 ? 'auto' : 'none';
-    }
+        <div class="slider-header">
+          <span class="field-label">Підсилення</span>
+          <span class="slider-val" id="val-gain">${gain.toFixed(1)}×</span>
+        </div>
+        <input type="range" class="slider" id="slider-gain" min="0.5" max="4.5" step="0.1" value="${gain}">
+        <div class="slider-hints"><span>Тихіше</span><span>Голосніше</span></div>
 
-    this.updateClassStatsUI();
+        <div class="mic-test-wrap">
+          <div class="mic-test-header">
+            <span>Рівень зараз</span>
+            <span id="mic-test-db">Вимк.</span>
+          </div>
+          <div class="mic-vu-bar-bg">
+            <div class="mic-vu-bar-fill" id="mic-vu-fill"></div>
+          </div>
+          <div class="mic-status-hint">
+            <span>Фон тиші: <strong id="hint-ambient">${Math.round(s.ambientBaselineDb || -55)} dB</strong></span>
+          </div>
+        </div>
+      `,
+      onMount: (el) => {
+        this.fillDeviceSelect(el.querySelector('#select-mic-device'));
+        el.querySelector('#select-mic-device').addEventListener('change', (e) => {
+          this.callbacks.onDeviceChange?.(e.target.value);
+        });
+        el.querySelectorAll('.profile-chip-btn').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            this.setProfileState(btn.dataset.profile);
+            this.callbacks.onProfileChange?.(btn.dataset.profile);
+          });
+        });
+        const sGain = el.querySelector('#slider-gain');
+        sGain.addEventListener('input', () => {
+          const val = parseFloat(sGain.value);
+          el.querySelector('#val-gain').textContent = `${val.toFixed(1)}×`;
+          this.callbacks.onGainChange?.(val);
+        });
+      },
+    });
   }
 
-  updateClassStatsUI() {
-    const cData = this.state.classes[this.state.activeClass];
-    if (!cData) return;
-
-    const elTotalStars = this.panel.querySelector('#stat-total-stars');
-    const elTasks = this.panel.querySelector('#stat-tasks');
-    const elGoals = this.panel.querySelector('#stat-goals');
-    const elQuietMin = this.panel.querySelector('#stat-quiet-min');
-    const btnResetGoal = this.panel.querySelector('#btn-reset-goal');
-
-    if (elTotalStars) elTotalStars.textContent = cData.totalStars ?? cData.stars ?? 0;
-    if (elTasks) elTasks.textContent = cData.tasksCompleted ?? 0;
-    if (elGoals) elGoals.textContent = cData.goalsReached ?? 0;
-    if (elQuietMin) elQuietMin.textContent = `${Math.floor((cData.quietSeconds || 0) / 60)} хв`;
-    if (btnResetGoal) {
-      btnResetGoal.innerHTML = `${iconReset()} Скинути поточні зірки (${cData.stars || 0}/${cData.goal || 20})`;
-    }
+  openHelpPopover(anchor) {
+    openPopover({
+      anchor,
+      side: 'left',
+      title: 'Як це працює',
+      width: 360,
+      html: `
+        <ol class="help-steps">
+          <li><b>Оберіть клас</b> зліва. У кожного класу своя банка зірок і свій приз.</li>
+          <li><b>Увімкніть мікрофон</b> і натисніть «Запам'ятати тишу», поки клас мовчить.</li>
+          <li><b>Оберіть режим</b> зверху: Тиха робота, Групи чи Перерва.</li>
+          <li>Кожні <b>30 секунд тиші</b> — зірка в банку (у класі можна зробити 60 чи 90 с). Набрали ціль — отримали приз.</li>
+        </ol>
+        <span class="field-label">Клавіші</span>
+        <dl class="hotkey-list">
+          ${HOTKEYS.map(([k, v]) => `<dt><kbd>${escapeHtml(k)}</kbd></dt><dd>${escapeHtml(v)}</dd>`).join('')}
+        </dl>
+      `,
+    });
   }
+
+  refreshSummaries() {
+    const theme = this.panel.querySelector('#row-theme-value');
+    const sound = this.panel.querySelector('#row-sound-value');
+    if (theme) theme.textContent = this.themeSummary();
+    if (sound) sound.textContent = this.soundSummary();
+  }
+
+  fillDeviceSelect(sel) {
+    if (!sel) return;
+    const currentId = this.state.settings.micDeviceId || '';
+    sel.innerHTML = [
+      `<option value="">Системний за замовчуванням</option>`,
+      ...this.devices.map((d, i) => {
+        const label = escapeHtml(d.label || `Мікрофон ${i + 1}`);
+        const selected = d.deviceId === currentId ? 'selected' : '';
+        return `<option value="${escapeHtml(d.deviceId)}" ${selected}>${label}</option>`;
+      }),
+    ].join('');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Public API used by main.js
+  // ---------------------------------------------------------------------------
 
   toggle(force = null) {
     const isClosed = this.panel.classList.contains('closed');
     const nextClosed = force !== null ? !force : !isClosed;
     this.panel.classList.toggle('closed', nextClosed);
-    if (!nextClosed) {
-      this.updateClassStatsUI();
-    }
+  }
+
+  get isOpen() {
+    return !this.panel.classList.contains('closed');
   }
 
   populateAudioDevices(devices, currentDeviceId = '') {
-    const sel = this.panel.querySelector('#select-mic-device');
-    if (!sel) return;
-
-    if (!devices || devices.length === 0) {
-      sel.innerHTML = `<option value="">Системний за замовчуванням</option>`;
-      return;
-    }
-
-    sel.innerHTML = [
-      `<option value="">Системний за замовчуванням</option>`,
-      ...devices.map((d, i) => {
-        const label = d.label || `Мікрофон ${i + 1}`;
-        const isSelected = d.deviceId === currentDeviceId;
-        return `<option value="${d.deviceId}" ${isSelected ? 'selected' : ''}>${label}</option>`;
-      })
-    ].join('');
+    this.devices = devices || [];
+    if (currentDeviceId) this.state.settings.micDeviceId = currentDeviceId;
+    this.fillDeviceSelect(this.$('#select-mic-device'));
   }
 
   setGainValue(val) {
-    const sGain = this.panel.querySelector('#slider-gain');
-    const vGain = this.panel.querySelector('#val-gain');
+    const sGain = this.$('#slider-gain');
+    const vGain = this.$('#val-gain');
     if (sGain) sGain.value = val;
     if (vGain) vGain.textContent = `${Number(val).toFixed(1)}×`;
   }
 
   setProfileState(profileId) {
-    this.panel.querySelectorAll('.profile-chip-btn').forEach(btn => {
+    getOpenPopover()?.querySelectorAll('.profile-chip-btn').forEach((btn) => {
       btn.classList.toggle('active', btn.dataset.profile === profileId);
     });
   }
 
   updateMicLiveMeter(rawDb, smoothedDb, ambientDb, yellowDb, redDb, isActive = true) {
-    if (this.panel.classList.contains('closed')) return;
+    if (!this.isOpen && !getOpenPopover()) return;
 
-    const valEl = this.panel.querySelector('#mic-test-db');
-    const fillEl = this.panel.querySelector('#mic-vu-fill');
-    const hintAmbient = this.panel.querySelector('#hint-ambient');
-    const hintStatus = this.panel.querySelector('#hint-status');
-
+    const miniFill = this.panel.querySelector('#mini-meter-fill');
+    const fillEl = this.$('#mic-vu-fill');
+    const valEl = this.$('#mic-test-db');
+    const hintAmbient = this.$('#hint-ambient');
     if (hintAmbient) hintAmbient.textContent = `${Math.round(ambientDb)} dB`;
 
     if (!isActive) {
       if (valEl) valEl.textContent = 'Вимк.';
       if (fillEl) fillEl.style.width = '0%';
-      if (hintStatus) {
-        hintStatus.className = '';
-        hintStatus.textContent = 'Мікрофон вимкнено';
-      }
+      if (miniFill) miniFill.style.width = '0%';
       return;
     }
 
-    if (valEl) valEl.textContent = `${Math.round(smoothedDb)} dB`;
+    const minScale = -75;
+    const maxScale = -15;
+    const pct = Math.max(0, Math.min(100, ((smoothedDb - minScale) / (maxScale - minScale)) * 100));
+    let color = 'var(--zone-green)';
+    if (smoothedDb >= redDb) color = 'var(--zone-red)';
+    else if (smoothedDb >= yellowDb) color = 'var(--zone-yellow)';
 
-    if (fillEl) {
-      const minScale = -75;
-      const maxScale = -15;
-      const pct = Math.max(0, Math.min(100, ((smoothedDb - minScale) / (maxScale - minScale)) * 100));
-      fillEl.style.width = `${pct}%`;
-
-      if (smoothedDb >= redDb) {
-        fillEl.style.background = 'var(--zone-red)';
-        if (hintStatus) {
-          hintStatus.className = 'status-noise';
-          hintStatus.textContent = 'Перевищення порогу (шум)';
-        }
-      } else if (smoothedDb >= yellowDb) {
-        fillEl.style.background = 'var(--zone-yellow)';
-        if (hintStatus) {
-          hintStatus.className = 'status-whisper';
-          hintStatus.textContent = 'Жовта зона (шепіт)';
-        }
-      } else {
-        fillEl.style.background = 'var(--zone-green)';
-        if (hintStatus) {
-          hintStatus.className = 'status-calm';
-          hintStatus.textContent = 'Зелена зона (норма)';
-        }
-      }
+    for (const el of [fillEl, miniFill]) {
+      if (!el) continue;
+      el.style.width = `${pct}%`;
+      el.style.background = color;
     }
+    if (valEl) valEl.textContent = `${Math.round(smoothedDb)} dB`;
   }
 
   setMicButtonState(isListening) {
+    this.isListening = isListening;
     const btn = this.panel.querySelector('#btn-toggle-mic');
     if (btn) {
-      btn.innerHTML = `${iconMic(isListening)} <span>${isListening ? 'Вимк. мікрофон' : 'Увімк. мікрофон'}</span>`;
-      btn.classList.toggle('active', isListening);
+      btn.innerHTML = `${iconMic(!isListening)} <span>${isListening ? 'Вимкнути' : 'Увімкнути'}</span>`;
+      btn.classList.toggle('secondary', isListening);
+    }
+    const pill = this.panel.querySelector('#mic-pill');
+    if (pill) {
+      pill.textContent = isListening ? 'Слухає клас' : 'Вимкнено';
+      pill.classList.toggle('on', isListening);
     }
   }
 
   setCalibrateButtonState(isCalibrating) {
+    this.isCalibrating = isCalibrating;
     const btn = this.panel.querySelector('#btn-calibrate');
     if (btn) {
-      btn.innerHTML = `${iconCalibrate()} <span>${isCalibrating ? 'Калібрування...' : 'Калібрувати (3с)'}</span>`;
+      btn.innerHTML = `${iconCalibrate()} <span>${isCalibrating ? 'Тиша… слухаю' : "Запам'ятати тишу"}</span>`;
       btn.classList.toggle('active', isCalibrating);
-    }
-  }
-
-  setModeState(modeId) {
-    this.panel.querySelectorAll('.mode-card-btn').forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.mode === modeId);
-    });
-    const descEl = this.panel.querySelector('#mode-tech-desc');
-    if (descEl && MODE_TECH_NOTES[modeId]) {
-      descEl.textContent = MODE_TECH_NOTES[modeId];
     }
   }
 }

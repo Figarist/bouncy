@@ -6,11 +6,21 @@ import { sfx } from './audio/sfx.js';
 import { ZoneStateMachine } from './game/zones.js';
 import { StarManager } from './game/stars.js';
 import { SessionManager } from './game/session.js';
-import { StorageManager, createClassRecord } from './game/storage.js';
+import {
+  StorageManager,
+  createClassRecord,
+  renameClassRecord,
+  reorderClassRecord,
+  nextClassColor,
+  recordPrize,
+  MAX_CLASS_NAME_LENGTH,
+} from './game/storage.js';
 import { PhysicsWorld } from './world/physics.js';
 import { CanvasRenderer } from './render/renderer.js';
 import { HUD } from './ui/hud.js';
 import { TeacherPanel } from './ui/teacher-panel.js';
+import { ClassSidebar } from './ui/class-sidebar.js';
+import { getOpenPopover } from './ui/popover.js';
 import { HotkeyManager } from './ui/hotkeys.js';
 import { IntroOverlay } from './ui/intro.js';
 import { iconLab } from './ui/icons.js';
@@ -37,7 +47,7 @@ class GameApp {
     const classData = this.state.classes[activeClass] || createClassRecord();
 
     this.stars = new StarManager({
-      secondsPerStar: CONFIG.stars.secondsPerStar,
+      secondsPerStar: classData.secondsPerStar || CONFIG.stars.secondsPerStar,
       goldenComboSeconds: CONFIG.stars.goldenComboSeconds,
       initialStars: classData.stars,
       goal: classData.goal,
@@ -52,20 +62,20 @@ class GameApp {
     });
 
     // UI
-    this.hud = new HUD(
-      {
-        onModeChange: (modeId) => this.switchMode(modeId),
-        onClassChange: (className) => this.switchClass(className),
-        onQuickCalibrate: () => this.calibrateMic(),
-        onPanelToggle: () => this.panel.toggle(),
-        onTimerToggle: () => this.session.toggleTimer(),
-        onResetGoal: () => this.resetCurrentStars(),
-      },
-      this.state.classes,
-      this.state.activeClass
-    );
+    this.hud = new HUD({
+      onModeChange: (modeId) => this.switchMode(modeId),
+      onQuickCalibrate: () => this.calibrateMic(),
+      onPanelToggle: () => this.panel.toggle(),
+      onTimerToggle: () => this.session.toggleTimer(),
+      onTimerStart: (minutes) => this.session.startTimer(minutes),
+      onTimerCancel: () => this.session.cancelTimer(),
+      onResetGoal: () => this.resetCurrentStars(),
+    });
+    this.hud.updateMode(modeCfg.id);
+    this.hud.setClassName(activeClass, classData.color);
 
     this.panel = new TeacherPanel(this.state, this.getPanelCallbacks());
+    this.sidebar = new ClassSidebar(this.state, this.getSidebarCallbacks());
 
     // Sound volume init
     sfx.setVolume(this.state.settings.volume);
@@ -122,20 +132,95 @@ class GameApp {
     const cData = this.state.classes[className];
     this.stars.stars = cData.stars;
     this.stars.goal = cData.goal;
+    this.stars.secondsPerStar = cData.secondsPerStar || CONFIG.stars.secondsPerStar;
     this.stars.resetProgress();
     this.displayedStars = cData.stars;
     this.hasCelebratedGoal = cData.stars >= cData.goal;
     this.saveState();
-    this.hud.renderClassSwitcher(this.state.classes, className);
+    this.hud.setClassName(className, cData.color);
     this.hud.updateStars(this.displayedStars, this.stars.goal, 0, false, cData.reward);
-    this.panel.refreshClassList();
+    this.sidebar.update();
+  }
+
+  getSidebarCallbacks() {
+    return {
+      onSelect: (className) => this.switchClass(className),
+      onAdd: (rawName) => {
+        const name = rawName.trim().slice(0, MAX_CLASS_NAME_LENGTH);
+        if (!name || Object.hasOwn(this.state.classes, name)) return false;
+        this.state.classes[name] = createClassRecord({ color: nextClassColor(this.state.classes) });
+        this.switchClass(name);
+        return true;
+      },
+      onRename: (oldName, newName) => {
+        const next = renameClassRecord(this.state.classes, oldName, newName);
+        if (!next) return false;
+        const renamed = Object.keys(next)[Object.keys(this.state.classes).indexOf(oldName)];
+        this.state.classes = next;
+        if (this.state.activeClass === oldName) this.state.activeClass = renamed;
+        this.saveState();
+        this.hud.setClassName(this.state.activeClass, next[this.state.activeClass]?.color);
+        return true;
+      },
+      onReorder: (className, toIndex) => {
+        const next = reorderClassRecord(this.state.classes, className, toIndex);
+        if (!next) return;
+        this.state.classes = next;
+        this.saveState();
+      },
+      onColorChange: (color) => {
+        const cData = this.state.classes[this.state.activeClass];
+        if (!cData) return;
+        cData.color = color;
+        this.saveState();
+        this.hud.setClassName(this.state.activeClass, color);
+      },
+      onStarSpeedChange: (seconds) => {
+        const cData = this.state.classes[this.state.activeClass];
+        if (!cData) return;
+        cData.secondsPerStar = seconds;
+        this.stars.secondsPerStar = seconds;
+        this.saveState();
+      },
+      onDelete: (className) => {
+        const keys = Object.keys(this.state.classes);
+        if (keys.length <= 1) return;
+        delete this.state.classes[className];
+        this.switchClass(Object.keys(this.state.classes)[0]);
+      },
+      onGoalChange: (goal, reward) => {
+        const cData = this.state.classes[this.state.activeClass];
+        if (!cData) return;
+        cData.goal = goal;
+        cData.reward = reward;
+        this.stars.goal = goal;
+        this.hasCelebratedGoal = this.stars.stars >= goal;
+        this.saveState();
+        this.hud.updateStars(this.stars.stars, this.stars.goal, 0, false, reward);
+      },
+      onAddStar: () => this.awardStarWithFlight(),
+      onAddTask: () => {
+        const cData = this.state.classes[this.state.activeClass];
+        if (!cData) return;
+        cData.tasksCompleted = (cData.tasksCompleted || 0) + 1;
+        sfx.playChime();
+        this.saveState();
+        this.sidebar.update();
+      },
+      onResetStars: () => this.resetCurrentStars(),
+      onCollapseChange: (collapsed) => {
+        this.state.settings.sidebarCollapsed = collapsed;
+        this.saveState();
+      },
+      onSortChange: (sort) => {
+        this.state.settings.sidebarSort = sort;
+        this.saveState();
+      },
+    };
   }
 
   getPanelCallbacks() {
     return {
-      onModeChange: (modeId) => {
-        this.switchMode(modeId);
-      },
       onMicToggle: async () => {
         await this.toggleMicrophone();
       },
@@ -204,52 +289,6 @@ class GameApp {
       onFullscreen: () => {
         this.toggleFullscreen();
       },
-      onTimerStart: (minutes) => {
-        this.session.startTimer(minutes);
-        this.panel.toggle(false);
-      },
-      onClassChange: (className) => {
-        this.switchClass(className);
-      },
-      onAddClass: (className) => {
-        if (!this.state.classes[className]) {
-          this.state.classes[className] = createClassRecord();
-        }
-        this.switchClass(className);
-      },
-      onDeleteClass: (className) => {
-        const keys = Object.keys(this.state.classes);
-        if (keys.length <= 1) return;
-        delete this.state.classes[className];
-        const nextClass = Object.keys(this.state.classes)[0];
-        this.switchClass(nextClass);
-      },
-      onAddTask: () => {
-        const cData = this.state.classes[this.state.activeClass];
-        if (cData) {
-          cData.tasksCompleted = (cData.tasksCompleted || 0) + 1;
-          sfx.playChime();
-          this.saveState();
-          this.hud.renderClassSwitcher(this.state.classes, this.state.activeClass);
-        }
-      },
-      onResetGoal: () => {
-        this.resetCurrentStars();
-      },
-      onAddStar: () => {
-        this.awardStarWithFlight();
-      },
-      onGoalChange: (goal, reward) => {
-        const cData = this.state.classes[this.state.activeClass];
-        if (cData) {
-          cData.goal = goal;
-          cData.reward = reward;
-          this.stars.goal = goal;
-          this.hasCelebratedGoal = this.stars.stars >= goal;
-          this.saveState();
-          this.hud.updateStars(this.stars.stars, this.stars.goal, 0, false, reward);
-        }
-      },
     };
   }
 
@@ -258,7 +297,6 @@ class GameApp {
     this.state.settings.mode = modeId;
     const modeCfg = this.session.getModeConfig();
     this.hud.updateMode(modeCfg.id);
-    this.panel.setModeState(modeCfg.id);
     this.saveState();
   }
 
@@ -307,7 +345,7 @@ class GameApp {
     this.hasCelebratedGoal = false;
     this.saveState();
     this.hud.updateStars(0, this.stars.goal, 0, false, cData?.reward || 'Нагорода');
-    this.panel.updateClassStatsUI();
+    this.sidebar.update();
   }
 
   checkGoalReached() {
@@ -316,8 +354,9 @@ class GameApp {
       this.hasCelebratedGoal = true;
       if (cData) {
         cData.goalsReached = (cData.goalsReached || 0) + 1;
+        recordPrize(cData, cData.reward);
         this.saveState();
-        this.panel.updateClassStatsUI();
+        this.sidebar.update();
       }
       sfx.playFanfare();
       this.renderer.particles.spawnConfetti(this.renderer.width, this.renderer.height);
@@ -442,7 +481,7 @@ class GameApp {
       document.body.classList.remove('hide-cursor');
       clearTimeout(this.cursorTimer);
       this.cursorTimer = setTimeout(() => {
-        if (this.panel.panel.classList.contains('closed')) {
+        if (!this.panel.isOpen && !getOpenPopover()) {
           document.body.classList.add('hide-cursor');
         }
       }, 3500);
@@ -507,7 +546,7 @@ class GameApp {
     if (cData) {
       cData.stars = this.stars.stars;
       this.saveState();
-      this.panel.updateClassStatsUI();
+      this.sidebar.update();
     }
   }
 
@@ -585,7 +624,7 @@ class GameApp {
       if (this.quietStatSaveTimer >= 15) {
         this.quietStatSaveTimer = 0;
         this.saveState();
-        this.panel.updateClassStatsUI();
+        this.sidebar.refreshEditor();
       }
     }
 
@@ -666,8 +705,7 @@ class GameApp {
           activeClassData.cleanTasks = (activeClassData.cleanTasks || 0) + 1;
         }
         this.saveState();
-        this.hud.renderClassSwitcher(this.state.classes, this.state.activeClass);
-        this.panel.updateClassStatsUI();
+        this.sidebar.update();
       }
       sfx.playFanfare();
       this.renderer.particles.spawnConfetti(this.renderer.width, this.renderer.height);
@@ -703,7 +741,7 @@ class GameApp {
       starRes.isGolden,
       activeClassData?.reward || '5 хв мультика'
     );
-    this.hud.updateTimer(timerRes.remaining, timerRes.running);
+    this.hud.updateTimer(timerRes.remaining, timerRes.running, this.session.timerTotalSeconds);
   }
 }
 
