@@ -73,6 +73,7 @@ class GameApp {
     this.lastFrameTime = performance.now();
     this.lastAlertTime = 0;
     this.isPaused = false;
+    this.wasCalibrating = false;
     this.cursorTimer = null;
     this.pointerTarget = { x: null, y: null };
     this.displayedStars = classData.stars;
@@ -97,20 +98,25 @@ class GameApp {
     requestAnimationFrame(this.loop.bind(this));
   }
 
+  async toggleMicrophone() {
+    const listening = await this.mic.toggle();
+    this.panel.setMicButtonState(listening);
+    if (listening) {
+      const devices = await this.mic.listDevices();
+      this.panel.populateAudioDevices(devices, this.mic.deviceId);
+    } else if (this.mic.error) {
+      this.hud.showMicBlockedHelp();
+    }
+    return listening;
+  }
+
   getPanelCallbacks() {
     return {
       onModeChange: (modeId) => {
         this.switchMode(modeId);
       },
       onMicToggle: async () => {
-        const listening = await this.mic.toggle();
-        this.panel.setMicButtonState(listening);
-        if (listening) {
-          const devices = await this.mic.listDevices();
-          this.panel.populateAudioDevices(devices, this.mic.deviceId);
-        } else if (this.mic.error) {
-          this.hud.showMicBlockedHelp();
-        }
+        await this.toggleMicrophone();
       },
       onCalibrate: () => {
         this.calibrateMic();
@@ -230,7 +236,8 @@ class GameApp {
 
   calibrateMic() {
     this.mic.startCalibration(CONFIG.calibrationMs);
-    this.panel.setCalibrateButtonState(true);
+    this.wasCalibrating = this.mic.isCalibrating;
+    this.panel.setCalibrateButtonState(this.mic.isCalibrating);
   }
 
   awardStarWithFlight() {
@@ -286,26 +293,19 @@ class GameApp {
   }
 
   async startLesson() {
-    // 1. Resize world to current window
     this.onResize();
 
-    // 2. Start microphone automatically upon clicking Start
     const ok = await this.mic.start(this.state.settings.micDeviceId);
     this.panel.setMicButtonState(ok);
 
     if (ok) {
-      // Populate available microphone devices
       const devices = await this.mic.listDevices();
       this.panel.populateAudioDevices(devices, this.mic.deviceId);
-
-      // Auto-calibrate for 3 seconds to sample classroom noise floor
       this.calibrateMic();
     } else {
-      // Microphone was blocked or unavailable: inform user
       this.hud.showMicBlockedHelp();
     }
 
-    // 3. Request wake lock so screen doesn't turn off on TV
     this.requestWakeLock();
   }
 
@@ -349,11 +349,9 @@ class GameApp {
       this.pointerTarget = { x, y };
       const touchedBall = this.physics.onPointerDown(e.pointerId, x, y);
 
-      // Bubble pop mechanic
       if (touchedBall && this.renderer.theme === 'bubbles') {
         sfx.playPop();
         this.renderer.particles.spawnPop(touchedBall.x, touchedBall.y, touchedBall.radius);
-        // Teleport popped bubble to top
         touchedBall.y = -touchedBall.radius;
         touchedBall.py = touchedBall.y;
       }
@@ -379,8 +377,7 @@ class GameApp {
         this.isPaused = !this.isPaused;
       },
       onM: async () => {
-        const on = await this.mic.toggle();
-        this.panel.setMicButtonState(on);
+        await this.toggleMicrophone();
       },
       onC: () => {
         this.calibrateMic();
@@ -484,7 +481,6 @@ class GameApp {
     const dt = Math.min(0.1, (now - this.lastFrameTime) / 1000);
     this.lastFrameTime = now;
 
-    // Debug FPS counter
     if (this.fpsEl) {
       this.frameCount++;
       if (now - this.fpsTimer >= 1000) {
@@ -498,7 +494,13 @@ class GameApp {
 
     // 1. Audio Sampling
     const sample = this.mic.sample(this.simulatedDb);
-    this.panel.setCalibrateButtonState(sample.isCalibrating);
+    if (sample.isCalibrating !== this.wasCalibrating) {
+      this.wasCalibrating = sample.isCalibrating;
+      this.panel.setCalibrateButtonState(sample.isCalibrating);
+      if (!sample.isCalibrating) {
+        this.saveState();
+      }
+    }
 
     // 2. Zone Evaluation
     const modeConfig = this.session.getModeConfig();
@@ -510,13 +512,15 @@ class GameApp {
       this.state.settings.sensitivity
     );
 
-    // Live VU meter in Teacher Panel
+    // Live VU meter in Teacher Panel (only show active dB when mic is on or simulated)
+    const isSignalActive = this.mic.isListening || this.simulatedDb !== null;
     this.panel.updateMicLiveMeter(
       sample.rawDb,
       sample.db,
       sample.ambientDb,
       evalResult.yellowDb,
-      evalResult.redDb
+      evalResult.redDb,
+      isSignalActive
     );
 
     // 3. Zone State Machine Update
@@ -531,32 +535,26 @@ class GameApp {
 
     // 4. Physical reaction to voice across modes:
     if (modeConfig.id === 'breaktime') {
-      // Classic bouncy balls: scream and bounce!
       if (evalResult.progress > 0.25) {
         const impulse = (evalResult.progress - 0.2) * 26;
         this.physics.bounceBalls(impulse);
       }
     } else {
-      // Quiet & Groups modes:
-      // a) Yellow zone / stirring: sound over silence threshold stirs and jitters balls
       if (currentZone === 'yellow' || (evalResult.progress >= 0.6 && currentZone !== 'red')) {
         this.physics.stirBalls(evalResult.progress);
       }
 
-      // b) Red zone / chaos:
       if (currentZone === 'red') {
         if (zoneState.changed) {
           this.physics.scareBounce(1.5);
           this.hud.triggerScreenShake();
           this.hud.triggerJarBounce();
         } else {
-          // Sustained loud noise in red zone keeps balls agitated in chaos!
           this.physics.chaosAgitate(evalResult.progress);
         }
       }
     }
 
-    // In quiet / groups mode: red alert triggers banner + sound effect
     if (currentZone === 'red' && zoneState.changed && modeConfig.rewardsEnabled) {
       if (now - this.lastAlertTime > CONFIG.alertCooldownMs) {
         this.lastAlertTime = now;
@@ -595,7 +593,6 @@ class GameApp {
       sfx.playFanfare();
       this.renderer.particles.spawnConfetti(this.renderer.width, this.renderer.height);
       if (timerRes.cleanStreak && modeConfig.rewardsEnabled) {
-        // Bonus star for clean timer!
         this.awardStarWithFlight();
       }
     }
@@ -632,7 +629,6 @@ class GameApp {
   }
 }
 
-// Bootstrap once DOM is loaded
 window.addEventListener('DOMContentLoaded', () => {
   new GameApp();
 });

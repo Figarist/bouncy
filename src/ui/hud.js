@@ -10,8 +10,6 @@ import {
   iconReset,
   iconLock,
   iconGift,
-  iconParty,
-  iconSparkles,
 } from './icons.js';
 
 export class HUD {
@@ -34,9 +32,9 @@ export class HUD {
         <!-- Left: Noise Traffic Light & Visual Threshold Wave Meter -->
         <div class="traffic-light-meter" id="traffic-light">
           <div class="traffic-dots">
-            <div class="light-dot green active" title="Спокій"></div>
-            <div class="light-dot yellow" title="Шепіт / Робочий шум"></div>
-            <div class="light-dot red" title="Галас!"></div>
+            <div class="light-dot green active" title="Тиша (зелена зона)"></div>
+            <div class="light-dot yellow" title="Шепіт (жовта зона)"></div>
+            <div class="light-dot red" title="Шум (червона зона)"></div>
           </div>
           <div class="sound-meter-wrap" id="sound-meter-wrap">
             <div class="meter-threshold-tick yellow-tick" title="Поріг жовтої зони"></div>
@@ -96,14 +94,14 @@ export class HUD {
         </div>
       </div>
 
-      <!-- Large Bouncy Alert Banner -->
+      <!-- Large Alert Banner -->
       <div class="alert-banner hidden" id="alert-banner">
         <h2 id="alert-text">${t('shush')}</h2>
       </div>
 
       <!-- Golden Combo Banner -->
       <div class="golden-banner hidden" id="golden-banner">
-        ${iconSparkles()} <span>${t('goldenCombo')}</span>
+        <span>${t('goldenCombo')}</span>
       </div>
 
       <!-- Microphone Permission Blocked Help Toast -->
@@ -112,25 +110,24 @@ export class HUD {
           <span class="toast-icon">${iconLock()}</span>
           <div class="toast-text">
             <strong>Доступ до мікрофона заблоковано</strong>
-            <p>Натисніть на значок замочка в адресному рядку браузера та виберіть «Дозволити мікрофон».</p>
+            <p>Натисніть на значок замка в адресному рядку браузера та оберіть «Дозволити мікрофон».</p>
           </div>
         </div>
         <button class="toast-close-btn" id="toast-close-btn">${iconClose()}</button>
       </div>
 
-      <!-- Goal Achieved Celebration Modal -->
+      <!-- Goal Achieved Modal -->
       <div class="goal-modal-overlay hidden" id="goal-modal">
         <div class="goal-modal-card">
-          <div class="goal-modal-badge">${iconStar(true)}</div>
-          <h2>${iconParty()} Ціль тижня досягнуто!</h2>
-          <p class="goal-modal-subtitle">Клас виконав поставлену мету та отримує заслужену нагороду:</p>
+          <h2>Ціль тижня виконано</h2>
+          <p class="goal-modal-subtitle">Нагорода класу:</p>
           <div class="goal-modal-reward" id="goal-modal-reward">${iconGift()} <span>5 хв мультика</span></div>
           <div class="goal-modal-actions">
             <button class="goal-action-btn primary" id="btn-goal-reset">
-              ${iconReset()} Розпочати новий тиждень
+              ${iconReset()} Новий тиждень
             </button>
             <button class="goal-action-btn secondary" id="btn-goal-close">
-              Продовжити
+              Закрити
             </button>
           </div>
         </div>
@@ -172,7 +169,6 @@ export class HUD {
   }
 
   bindEvents() {
-    // Top mode segmented tabs
     this.modeControl.querySelectorAll('.hud-mode-tab').forEach((tab) => {
       tab.addEventListener('click', () => {
         const mode = tab.dataset.mode;
@@ -181,29 +177,24 @@ export class HUD {
       });
     });
 
-    // Quick calibrate button
     const calBtn = this.container.querySelector('#cal-quick-btn');
     calBtn.addEventListener('click', () => {
       if (this.callbacks.onQuickCalibrate) this.callbacks.onQuickCalibrate();
     });
 
-    // Panel toggle button
     const panelBtn = this.container.querySelector('#panel-toggle-btn');
     panelBtn.addEventListener('click', () => {
       if (this.callbacks.onPanelToggle) this.callbacks.onPanelToggle();
     });
 
-    // Timer play/pause
     this.timerToggleBtn.addEventListener('click', () => {
       if (this.callbacks.onTimerToggle) this.callbacks.onTimerToggle();
     });
 
-    // Mic blocked toast close
     this.container.querySelector('#toast-close-btn')?.addEventListener('click', () => {
       this.micBlockedToast.classList.add('hidden');
     });
 
-    // Goal modal buttons
     this.container.querySelector('#btn-goal-close')?.addEventListener('click', () => {
       this.goalModal.classList.add('hidden');
     });
@@ -214,12 +205,10 @@ export class HUD {
   }
 
   updateNoiseMeter(zone, progress, isCalibrating, calProgress) {
-    // Traffic light dots
     this.dotGreen.classList.toggle('active', zone === 'green');
     this.dotYellow.classList.toggle('active', zone === 'yellow');
     this.dotRed.classList.toggle('active', zone === 'red');
 
-    // Bar fill with smooth gradient response
     if (isCalibrating) {
       this.dbBar.style.width = `${Math.round(calProgress * 100)}%`;
       this.dbBar.style.background = 'var(--zone-yellow)';
@@ -264,19 +253,15 @@ export class HUD {
       this.jarRewardLabel.textContent = rewardText;
     }
 
-    // Update circular progress ring
     const offset = this.ringCircumference - progress * this.ringCircumference;
     this.starRingFill.style.strokeDashoffset = offset;
 
-    // Update inner glass jar visual SVG
     this.jarSvgSlot.innerHTML = renderStarJarSvg(stars, goal);
-
     this.goldenBanner.classList.toggle('hidden', !isGolden);
   }
 
   triggerJarBounce() {
     this.jarWidget.classList.remove('jar-pop');
-    // Force reflow
     void this.jarWidget.offsetWidth;
     this.jarWidget.classList.add('jar-pop');
   }
@@ -317,9 +302,6 @@ export class HUD {
     this.micBlockedToast.classList.remove('hidden');
   }
 
-  /**
-   * Get window coordinates of the star jar mouth for flying star targeting
-   */
   getJarMouthCoords() {
     const rect = this.jarWidget.getBoundingClientRect();
     return {

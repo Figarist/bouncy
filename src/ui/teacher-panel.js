@@ -10,19 +10,24 @@ import {
   iconLock,
   iconCamera,
   iconLaptop,
-  iconSliders,
   getThemeCardIllustration,
 } from './icons.js';
 
 const THEMES = [
   { id: 'critters', title: 'Сплюшки', sub: 'Основна' },
-  { id: 'space', title: 'Космос', sub: '5-6 класи' },
-  { id: 'bubbles', title: 'Бульбашки', sub: 'Мильні' },
-  { id: 'emoji', title: 'Емоджі', sub: 'Емоції' },
-  { id: 'plastic', title: 'Глянець', sub: 'Більярд' },
+  { id: 'space', title: 'Космос', sub: 'Планети' },
+  { id: 'bubbles', title: 'Бульбашки', sub: 'Лопаються' },
+  { id: 'emoji', title: 'Емоджі', sub: 'Міміка' },
+  { id: 'plastic', title: 'Глянець', sub: 'Кулі' },
   { id: 'numbers', title: 'Числа', sub: '1 — 10' },
-  { id: 'eyes', title: 'Очі', sub: 'Слідкують' },
+  { id: 'eyes', title: 'Очі', sub: 'Курсор' },
 ];
+
+const MODE_TECH_NOTES = {
+  quiet: 'Поріг: +4.5 / +9.0 dB • Нагорода: +1 зірка кожні 30 с тиші',
+  groups: 'Поріг: +8.0 / +15.0 dB • Робоче обговорення в групах',
+  breaktime: 'Поріг: +12.0 / +20.0 dB • Висота стрибка від гучності голосу',
+};
 
 export class TeacherPanel {
   constructor(state, callbacks) {
@@ -44,38 +49,33 @@ export class TeacherPanel {
 
     this.panel.innerHTML = `
       <div class="panel-header">
-        <div class="panel-header-title">
-          <h2>Панель вчителя</h2>
-          <span class="panel-tag">Тихий клас v5</span>
-        </div>
+        <h2>Панель вчителя</h2>
         <button class="panel-close-btn" id="btn-close-panel" title="Закрити (H)">
           ${iconClose()}
         </button>
       </div>
 
       <div class="panel-body">
-        <!-- Lesson Mode Presets -->
+        <!-- Lesson Mode Presets (Compact 3-column workbench control) -->
         <div class="setting-group">
           <label class="setting-label">Режим уроку</label>
           <div class="mode-buttons-grid">
             <button class="mode-card-btn ${s.mode === 'quiet' ? 'active' : ''}" data-mode="quiet">
-              <span class="mode-card-title">Тиха робота</span>
-              <span class="mode-card-desc">Повний спокій під час завдань</span>
+              Тиха робота
             </button>
             <button class="mode-card-btn ${s.mode === 'groups' ? 'active' : ''}" data-mode="groups">
-              <span class="mode-card-title">Робота в групах</span>
-              <span class="mode-card-desc">Дозволений помірний шепіт</span>
+              Групи
             </button>
             <button class="mode-card-btn ${s.mode === 'breaktime' ? 'active' : ''}" data-mode="breaktime">
-              <span class="mode-card-title">Перерва</span>
-              <span class="mode-card-desc">Кульки весело стрибають від крику</span>
+              Перерва
             </button>
           </div>
+          <div class="mode-tech-hint" id="mode-tech-desc">${MODE_TECH_NOTES[s.mode] || MODE_TECH_NOTES.quiet}</div>
         </div>
 
         <!-- Microphone & Hardware Adaptation -->
-        <div class="setting-group">
-          <label class="setting-label">Мікрофон та адаптація</label>
+        <div class="setting-group section-divider">
+          <label class="setting-label">Мікрофон та DSP-тракт</label>
           <div class="btn-row">
             <button class="action-btn" id="btn-toggle-mic">
               ${iconMic(false)} <span>Увімк. мікрофон</span>
@@ -85,74 +85,71 @@ export class TeacherPanel {
             </button>
           </div>
 
-          <!-- Device selection dropdown -->
           <div class="mic-device-row">
-            <label class="sub-label" for="select-mic-device">Пристрій введення звуку:</label>
+            <label class="sub-label" for="select-mic-device">Пристрій вводу:</label>
             <select class="select-input" id="select-mic-device">
-              <option value="">Автовизначення / За замовчуванням</option>
+              <option value="">Системний за замовчуванням</option>
             </select>
           </div>
 
-          <!-- Profile quick selector -->
           <div class="mic-profiles-group">
-            <span class="sub-label">Тип мікрофона (DSP-фільтрація):</span>
+            <span class="sub-label">Профіль обладнання (HPF + Presence):</span>
             <div class="mic-profiles-row">
-              <button class="profile-chip-btn ${s.micProfile === 'webcam' ? 'active' : ''}" data-profile="webcam" title="Оптимально для вебкамер: фільтр шуму кулера + підсилення 2.2x">
-                ${iconCamera()} <span>Вебкамера (2-4м)</span>
+              <button class="profile-chip-btn ${s.micProfile === 'webcam' ? 'active' : ''}" data-profile="webcam" title="120 Hz HPF + 2.2 kHz (+3.5 dB) + Gain 2.2x">
+                ${iconCamera()} <span>Вебкамера</span>
               </button>
-              <button class="profile-chip-btn ${s.micProfile === 'laptop' ? 'active' : ''}" data-profile="laptop" title="Для вбудованих мікрофонів ноутбука: помірне підсилення 1.5x">
-                ${iconLaptop()} <span>Ноутбук / ПК</span>
+              <button class="profile-chip-btn ${s.micProfile === 'laptop' ? 'active' : ''}" data-profile="laptop" title="100 Hz HPF + 2.0 kHz (+2.0 dB) + Gain 1.5x">
+                ${iconLaptop()} <span>Ноутбук</span>
               </button>
-              <button class="profile-chip-btn ${s.micProfile === 'close' ? 'active' : ''}" data-profile="close" title="Для гарнітур та петличок: стандартне посилення 1.0x">
+              <button class="profile-chip-btn ${s.micProfile === 'close' ? 'active' : ''}" data-profile="close" title="80 Hz HPF + прямий сигнал 1.0x">
                 ${iconMic(true)} <span>Гарнітура</span>
               </button>
             </div>
           </div>
 
-          <!-- Live Signal VU-Meter Test -->
+          <!-- Live Signal VU-Meter Telemetry -->
           <div class="mic-test-wrap">
             <div class="mic-test-header">
-              <span>Живий сигнал мікрофона (VU):</span>
-              <span id="mic-test-db">-55 dB</span>
+              <span>Рівень сигналу (RMS):</span>
+              <span id="mic-test-db">Вимк.</span>
             </div>
             <div class="mic-vu-bar-bg">
               <div class="mic-vu-bar-fill" id="mic-vu-fill"></div>
-              <div class="mic-vu-tick yellow-tick" title="Поріг жовтої зони (шепіт)"></div>
-              <div class="mic-vu-tick red-tick" title="Поріг червоної зони (галас)"></div>
+              <div class="mic-vu-tick yellow-tick" title="Поріг жовтої зони"></div>
+              <div class="mic-vu-tick red-tick" title="Поріг червоної зони"></div>
             </div>
             <div class="mic-status-hint" id="mic-status-hint">
               <span>Фон: <strong id="hint-ambient">${Math.round(s.ambientBaselineDb || -55)} dB</strong></span>
               <span>•</span>
-              <span id="hint-status">Слухаємо кімнату...</span>
+              <span id="hint-status">Мікрофон вимкнено</span>
             </div>
           </div>
         </div>
 
-        <!-- Preamp Gain Slider -->
+        <!-- Sliders: Gain, Sensitivity, Balls -->
         <div class="setting-group">
           <div class="slider-header">
-            <span>Підсилення мікрофона (Preamp Gain)</span>
+            <span>Підсилення (Preamp Gain)</span>
             <span class="slider-val" id="val-gain">${s.micGain ? Number(s.micGain).toFixed(1) : '2.2'}×</span>
           </div>
           <input type="range" class="slider" id="slider-gain" min="0.5" max="4.5" step="0.1" value="${s.micGain || 2.2}">
           <div class="slider-hints">
-            <span>0.5× (студійний)</span>
+            <span>0.5×</span>
             <span>2.2× (вебкамера)</span>
-            <span>4.5× (тихий мікрофон)</span>
+            <span>4.5×</span>
           </div>
         </div>
 
-        <!-- Sliders: Sensitivity & Balls -->
         <div class="setting-group">
           <div class="slider-header">
-            <span>Чутливість до шуму</span>
+            <span>Зміщення порогів (Чутливість)</span>
             <span class="slider-val" id="val-sensitivity">${s.sensitivity > 0 ? '+' : ''}${s.sensitivity} dB</span>
           </div>
           <input type="range" class="slider" id="slider-sensitivity" min="-15" max="15" step="1" value="${s.sensitivity}">
           <div class="slider-hints">
-            <span>-15 (для галасливих)</span>
-            <span>0 (стандарт)</span>
-            <span>+15 (максимальна чутливість)</span>
+            <span>-15 dB (грубіше)</span>
+            <span>0 dB</span>
+            <span>+15 dB (чутливіше)</span>
           </div>
         </div>
 
@@ -165,8 +162,8 @@ export class TeacherPanel {
         </div>
 
         <!-- Theme Selection Grid -->
-        <div class="setting-group">
-          <label class="setting-label">Тема оформлення кульок</label>
+        <div class="setting-group section-divider">
+          <label class="setting-label">Тема сцени</label>
           <div class="themes-grid" id="themes-grid">
             ${THEMES.map(th => `
               <button class="theme-card ${s.theme === th.id ? 'active' : ''}" data-theme="${th.id}">
@@ -181,8 +178,8 @@ export class TeacherPanel {
         </div>
 
         <!-- Task Timer -->
-        <div class="setting-group">
-          <label class="setting-label">Швидкий запуск таймера</label>
+        <div class="setting-group section-divider">
+          <label class="setting-label">Таймер завдання</label>
           <div class="timer-chips">
             <button class="chip-btn" data-min="1">1 хв</button>
             <button class="chip-btn" data-min="2">2 хв</button>
@@ -192,34 +189,33 @@ export class TeacherPanel {
           </div>
         </div>
 
-        <!-- Alert Sound Segmented Switch -->
+        <!-- Alert Sound & Volume -->
         <div class="setting-group">
-          <label class="setting-label">Звук попередження «Тссс»</label>
+          <label class="setting-label">Звуковий сигнал при перевищенні</label>
           <div class="segmented-control" id="sound-control">
             <button class="segmented-tab ${s.alertSound === 'shush' ? 'active' : ''}" data-sound="shush">
               Шурхіт «Тссс»
             </button>
             <button class="segmented-tab ${s.alertSound === 'beep' ? 'active' : ''}" data-sound="beep">
-              М'який «Біп»
+              Тон «Біп»
             </button>
             <button class="segmented-tab ${s.alertSound === 'none' ? 'active' : ''}" data-sound="none">
-              Без звуку
+              Вимкнено
             </button>
           </div>
         </div>
 
-        <!-- Volume Slider -->
         <div class="setting-group">
           <div class="slider-header">
-            <span>Гучність гри</span>
+            <span>Гучність SFX</span>
             <span class="slider-val" id="val-volume">${Math.round(s.volume * 100)}%</span>
           </div>
           <input type="range" class="slider" id="slider-volume" min="0" max="1" step="0.05" value="${s.volume}">
         </div>
 
-        <!-- Classroom & Weekly Goal -->
-        <div class="setting-group class-card-box">
-          <label class="setting-label">Клас та нагорода тижня</label>
+        <!-- Classroom & Weekly Goal (Flattened section) -->
+        <div class="setting-group section-divider">
+          <label class="setting-label">Клас та тижнева ціль</label>
           <div class="class-selector-row">
             <div class="class-buttons" id="class-buttons-list">
               ${Object.keys(this.state.classes).map(c => `
@@ -235,35 +231,34 @@ export class TeacherPanel {
 
           <div class="goal-reward-edit">
             <div class="goal-input-wrap">
-              <span>Ціль тижня:</span>
+              <span>Ціль:</span>
               <input type="number" class="num-input" id="input-goal" min="5" max="100" value="${classData.goal}">
               <span>зірок</span>
-              <button class="chip-btn-gold" id="btn-add-star" title="Нарахувати 1 зірку зараз (S)">
-                ${iconStar(true)} +1
+              <button class="chip-btn-gold" id="btn-add-star" title="Нарахувати 1 зірку (S)">
+                +1 зірка
               </button>
             </div>
             <div class="reward-input-wrap">
-              <span>Нагорода:</span>
-              <input type="text" class="text-input" id="input-reward" value="${classData.reward}" placeholder="5 хв мультика / настільна гра">
+              <span>Приз:</span>
+              <input type="text" class="text-input" id="input-reward" value="${classData.reward}" placeholder="5 хв мультика / гра">
             </div>
-            <button class="action-btn-danger" id="btn-reset-week" title="Скинути зірки та розпочати новий тиждень">
-              ${iconReset()} Новий тиждень (скинути зірки)
+            <button class="action-btn-danger" id="btn-reset-week" title="Обнулити лічильник зірок обраного класу">
+              ${iconReset()} Скинути зірки на новий тиждень
             </button>
           </div>
         </div>
 
         <!-- Display Modes: Light Room & Fullscreen -->
-        <div class="setting-group">
+        <div class="setting-group section-divider">
           <label class="checkbox-label">
             <input type="checkbox" id="check-light-room" ${s.lightRoom ? 'checked' : ''}>
-            <span>Світла кімната (висока контрастність для проектора)</span>
+            <span>Світлий режим (контраст для проектора)</span>
           </label>
           <button class="action-btn secondary full-width" id="btn-fullscreen">
-            ${iconFullscreen()} <span>Повноекранний режим (F)</span>
+            ${iconFullscreen()} <span>Повний екран (F)</span>
           </button>
         </div>
 
-        <!-- Shortcuts Help -->
         <div class="panel-footer">
           <p class="privacy-text">${iconLock()} <span>${t('privacyNote')}</span></p>
           <p class="hotkeys-text">${t('hotkeysHelp')}</p>
@@ -278,8 +273,7 @@ export class TeacherPanel {
     // Mode buttons
     this.panel.querySelectorAll('.mode-card-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        this.panel.querySelectorAll('.mode-card-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
+        this.setModeState(btn.dataset.mode);
         this.callbacks.onModeChange(btn.dataset.mode);
       });
     });
@@ -417,7 +411,6 @@ export class TeacherPanel {
         const className = btn.dataset.class;
         this.callbacks.onClassChange(className);
 
-        // Update inputs
         const cData = this.state.classes[className] || { stars: 0, goal: 20, reward: '5 хв мультика' };
         const inGoal = this.panel.querySelector('#input-goal');
         const inReward = this.panel.querySelector('#input-reward');
@@ -456,12 +449,12 @@ export class TeacherPanel {
     if (!sel) return;
 
     if (!devices || devices.length === 0) {
-      sel.innerHTML = `<option value="">Автовизначення / За замовчуванням</option>`;
+      sel.innerHTML = `<option value="">Системний за замовчуванням</option>`;
       return;
     }
 
     sel.innerHTML = [
-      `<option value="">Авто / За замовчуванням</option>`,
+      `<option value="">Системний за замовчуванням</option>`,
       ...devices.map((d, i) => {
         const label = d.label || `Мікрофон ${i + 1}`;
         const isSelected = d.deviceId === currentDeviceId;
@@ -483,7 +476,7 @@ export class TeacherPanel {
     });
   }
 
-  updateMicLiveMeter(rawDb, smoothedDb, ambientDb, yellowDb, redDb) {
+  updateMicLiveMeter(rawDb, smoothedDb, ambientDb, yellowDb, redDb, isActive = true) {
     if (this.panel.classList.contains('closed')) return;
 
     const valEl = this.panel.querySelector('#mic-test-db');
@@ -491,11 +484,21 @@ export class TeacherPanel {
     const hintAmbient = this.panel.querySelector('#hint-ambient');
     const hintStatus = this.panel.querySelector('#hint-status');
 
-    if (valEl) valEl.textContent = `${Math.round(smoothedDb)} dB`;
     if (hintAmbient) hintAmbient.textContent = `${Math.round(ambientDb)} dB`;
 
+    if (!isActive) {
+      if (valEl) valEl.textContent = 'Вимк.';
+      if (fillEl) fillEl.style.width = '0%';
+      if (hintStatus) {
+        hintStatus.className = '';
+        hintStatus.textContent = 'Мікрофон вимкнено';
+      }
+      return;
+    }
+
+    if (valEl) valEl.textContent = `${Math.round(smoothedDb)} dB`;
+
     if (fillEl) {
-      // Map scale -75 dB (0%) to -15 dB (100%)
       const minScale = -75;
       const maxScale = -15;
       const pct = Math.max(0, Math.min(100, ((smoothedDb - minScale) / (maxScale - minScale)) * 100));
@@ -503,13 +506,22 @@ export class TeacherPanel {
 
       if (smoothedDb >= redDb) {
         fillEl.style.background = 'var(--zone-red)';
-        if (hintStatus) hintStatus.innerHTML = '<span style="color:var(--zone-red);font-weight:700">Галас у класі!</span>';
+        if (hintStatus) {
+          hintStatus.className = 'status-noise';
+          hintStatus.textContent = 'Перевищення порогу (шум)';
+        }
       } else if (smoothedDb >= yellowDb) {
         fillEl.style.background = 'var(--zone-yellow)';
-        if (hintStatus) hintStatus.innerHTML = '<span style="color:var(--zone-yellow);font-weight:700">Шепіт / Робочий шум</span>';
+        if (hintStatus) {
+          hintStatus.className = 'status-whisper';
+          hintStatus.textContent = 'Жовта зона (шепіт)';
+        }
       } else {
         fillEl.style.background = 'var(--zone-green)';
-        if (hintStatus) hintStatus.innerHTML = '<span style="color:var(--zone-green)">Спокійно</span>';
+        if (hintStatus) {
+          hintStatus.className = 'status-calm';
+          hintStatus.textContent = 'Зелена зона (норма)';
+        }
       }
     }
   }
@@ -525,7 +537,7 @@ export class TeacherPanel {
   setCalibrateButtonState(isCalibrating) {
     const btn = this.panel.querySelector('#btn-calibrate');
     if (btn) {
-      btn.innerHTML = `${iconCalibrate()} <span>${isCalibrating ? 'Калібруємо...' : 'Калібрувати (3с)'}</span>`;
+      btn.innerHTML = `${iconCalibrate()} <span>${isCalibrating ? 'Калібрування...' : 'Калібрувати (3с)'}</span>`;
       btn.classList.toggle('active', isCalibrating);
     }
   }
@@ -534,5 +546,9 @@ export class TeacherPanel {
     this.panel.querySelectorAll('.mode-card-btn').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.mode === modeId);
     });
+    const descEl = this.panel.querySelector('#mode-tech-desc');
+    if (descEl && MODE_TECH_NOTES[modeId]) {
+      descEl.textContent = MODE_TECH_NOTES[modeId];
+    }
   }
 }
