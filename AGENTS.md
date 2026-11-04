@@ -19,6 +19,12 @@ Every UI decision should pass the test "a teacher understands it in one second, 
 - **Privacy:** audio never leaves the browser; nothing is sent anywhere. Don't add analytics or network calls.
 - **Size for TV:** HUD and the class sidebar scale with `vmin`/`clamp()`. Settings panel and popovers use `px` (teacher-only, close range).
 - **Light room:** every new color must work under `body.light-room` too (tokens at the top of `main.css`).
+- **Style = Friendly Arcade** ([github.com/Figarist/friendly-arcade](https://github.com/Figarist/friendly-arcade)): solid tiles,
+  2px borders on controls / 3px on cards and windows, radii `--r-sm/md/lg/pill`, green primary buttons with `--on-green` text,
+  cyan `:focus-visible` ring, touch targets ≥ 44px. Use the arcade tokens (`--surface`, `--card`, `--green`…); the older names
+  (`--ink`, `--panel`, `--glass-*`) are aliases declared on `body` so they follow `body.light-room`. Fonts stay Rubik/Nunito.
+- **Class order** lives in `state.classOrder` (integer-like names such as "7" would otherwise jump to the top of an object);
+  read it through `classNames(state)` from `storage.js`.
 
 ## Commands
 
@@ -29,12 +35,12 @@ npm run dev:test     # Vite dev server opening /?debug automatically
 npm run serve:test   # Zero-dependency Node static server serving dist/ with ?debug
 npm test             # Vitest, all pure logic
 npm run build        # -> dist/
-npm run deploy:site  # build + rsync dist/ into ../figarist.github.io/bouncy/ (then commit & push that repo)
 ```
 
-Release checklist: bump `CACHE_NAME` in `public/sw.js` (otherwise teachers' offline PWA keeps the old version),
-`npm test`, `npm run build`, commit `dist/` here, `npm run deploy:site`, commit + push `../figarist.github.io`.
-See [DEPLOY.md](DEPLOY.md).
+**Releasing = pushing to `main`.** `.github/workflows/deploy.yml` runs `npm test`, builds and publishes `dist/`
+to GitHub Pages at https://sivochka.com/bouncy/ (this repo's own Pages site; `figarist.github.io` no longer holds a copy).
+`dist/` is not committed. The service worker cache name and its precache list are filled in at build time by the
+`sw-manifest` plugin in `vite.config.js`, so there is nothing to bump by hand. See [DEPLOY.md](DEPLOY.md).
 
 ## Architecture
 
@@ -52,7 +58,7 @@ src/ui/class-sidebar.js  Draggable physical class window: cards, leaderboard sor
 src/ui/teacher-panel.js  Settings drawer: mic card, sensitivity, popovers (balls/scale, sound, backup, PWA install)
 src/ui/popover.js        openPopover / closePopover / getOpenPopover / escapeHtml — one popover at a time
 src/ui/icons.js          All SVG icons and theme preview illustrations
-src/styles/main.css      Tokens, Liquid Glass surfaces, HUD, sidebar, panel, popovers
+src/styles/main.css      Friendly Arcade tokens + light-room overrides, HUD, sidebar, panel, popovers
 ```
 
 ### State (`localStorage['tyhyi-klas:v1']`)
@@ -60,6 +66,7 @@ src/styles/main.css      Tokens, Liquid Glass surfaces, HUD, sidebar, panel, pop
 ```js
 {
   activeClass: '4-Б',
+  classOrder: ['4-Б'],            // the teacher's manual order (see classNames())
   classes: {                       // object key order = the teacher's manual order
     '4-Б': {
       stars, goal, reward,         // current jar
@@ -79,9 +86,10 @@ src/styles/main.css      Tokens, Liquid Glass surfaces, HUD, sidebar, panel, pop
 }
 ```
 
-`StorageManager.load()` and `StorageManager.importBackup()` normalize old saves and imported files via `normalizeSettings()`
-(clamping `ballScale` to `0.2..2.0`, `balls` to `10..150`, and rounding `sidebarPos`), so new fields must get a default
-in `DEFAULT_STATE`, `normalizeSettings`, and `createClassRecord`. The class name is the key, so renaming and reordering
+`StorageManager.load()`, `restoreSnapshot()` and `importBackup()` all go through `normalizeState()`: settings keep only keys
+from `DEFAULT_STATE.settings` with the same type (numbers clamped), class records are rebuilt field by field with numbers
+coerced. That is the XSS guard for backups shared between teachers, so new fields must get a default in `DEFAULT_STATE`
+and a line in `normalizeClassRecord` / `normalizeSettings`. The class name is the key, so renaming and reordering
 rebuild the object — use `renameClassRecord` / `reorderClassRecord`, never mutate keys in place.
 `main.js` mutates `this.state` in-place on `onStateReload` so UI modules keep their shared `state` reference intact.
 

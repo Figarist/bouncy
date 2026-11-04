@@ -1,4 +1,5 @@
-const CACHE_NAME = 'tyhyi-klas-v9';
+// The build id and bundle asset placeholders below are filled in by the sw-manifest plugin in vite.config.js.
+const CACHE_NAME = 'tyhyi-klas-__BUILD_ID__';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -6,6 +7,7 @@ const CORE_ASSETS = [
   './icon.svg',
   './icon-192.png',
   './icon-512.png',
+  '__BUNDLE_ASSETS__',
 ];
 
 self.addEventListener('install', (event) => {
@@ -55,7 +57,7 @@ self.addEventListener('fetch', (event) => {
           }
           return response;
         })
-        .catch(() => cached);
+        .catch(() => cached || Response.error());
 
       return cached || networked;
     })
