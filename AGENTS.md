@@ -45,6 +45,10 @@ npm run build        # -> dist/
 to GitHub Pages at https://sivochka.com/bouncy/ (this repo's own Pages site; `figarist.github.io` no longer holds a copy).
 `dist/` is not committed. The service worker cache name and its precache list are filled in at build time by the
 `sw-manifest` plugin in `vite.config.js`, so there is nothing to bump by hand. See [DEPLOY.md](DEPLOY.md).
+The service worker is registered from `src/ui/update-notice.js` (production builds only). After a new build replaces
+an older `tyhyi-klas-*` cache, `sw.js` posts `{ type: 'sw-updated', assets }`; the page shows «Оновлено» if its own
+bundle is in that list, or «Доступна нова версія» with a reload button if the tab predates the deploy. Open tabs check
+for a new deploy every 30 minutes and when they become visible.
 
 ## Architecture
 
