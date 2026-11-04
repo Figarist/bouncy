@@ -7,7 +7,6 @@
     "dev": "vite",
     "dev:test": "vite --open /?debug",
     "build": "vite build",
-    "deploy:site": "npm run build && rsync -av --delete dist/ ../figarist.github.io/bouncy/",
     "preview": "vite preview",
     "serve:test": "node scripts/serve-test.mjs",
     "test": "vitest run"
