@@ -362,6 +362,9 @@ class GameApp {
   applyLightRoom(isLight) {
     this.state.settings.lightRoom = Boolean(isLight);
     document.body.classList.toggle('light-room', Boolean(isLight));
+    // Friendly Arcade light tokens
+    if (isLight) document.documentElement.dataset.theme = 'light';
+    else delete document.documentElement.dataset.theme;
     this.renderer.setLightRoom(Boolean(isLight));
   }
 

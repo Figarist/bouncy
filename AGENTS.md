@@ -12,14 +12,18 @@ Every UI decision should pass the test "a teacher understands it in one second, 
 - **Work on `main`.** Commit straight to `main` and push; the owner does not use feature branches.
 - **UI language is Ukrainian.** Write user-visible text in plain Ukrainian a non-technical teacher understands
   ("Запам'ятати тишу", not "Калібрування DSP"). Keep technical terms (dB, HPF, RMS) out of the main UI.
-- **No runtime dependencies.** Vanilla JS modules + Vite. Fonts come from `@fontsource`. Don't add frameworks.
+- **No runtime dependencies.** Vanilla JS modules + Vite. Fonts come from `@fontsource`, design tokens from `friendly-arcade` (both bundled at build time). Don't add frameworks.
 - **No system emoji in the UI.** Icons are inline SVG from `src/ui/icons.js` (emoji in docs are fine).
 - **Escape anything the teacher typed** (class names, prizes, device labels, snapshot labels) with `escapeHtml` from `src/ui/popover.js`
   before putting it into `innerHTML`. Remember that `el.dataset.x` returns the *unescaped* value.
 - **Privacy:** audio never leaves the browser; nothing is sent anywhere. Don't add analytics or network calls.
 - **Size for TV:** HUD and the class sidebar scale with `vmin`/`clamp()`. Settings panel and popovers use `px` (teacher-only, close range).
 - **Light room:** every new color must work under `body.light-room` too (tokens at the top of `main.css`).
-- **Style = Friendly Arcade** ([github.com/Figarist/friendly-arcade](https://github.com/Figarist/friendly-arcade)): solid tiles,
+- **Style = Friendly Arcade** ([github.com/Figarist/friendly-arcade](https://github.com/Figarist/friendly-arcade)), installed as a
+  pinned git dependency (`friendly-arcade#vX.Y.Z` in `package.json`) and imported at the top of `main.css`
+  (`@import 'friendly-arcade/tokens.css'`). Never copy token values into `main.css`; to change the palette, release a new
+  friendly-arcade version and bump the tag here. Light room sets `<html data-theme="light">` (package light tokens) plus
+  `body.light-room` for app-specific rules. Look: solid tiles,
   2px borders on controls / 3px on cards and windows, radii `--r-sm/md/lg/pill`, green primary buttons with `--on-green` text,
   cyan `:focus-visible` ring, touch targets ≥ 44px. Use the arcade tokens (`--surface`, `--card`, `--green`…); the older names
   (`--ink`, `--panel`, `--glass-*`) are aliases declared on `body` so they follow `body.light-room`. Fonts stay Rubik/Nunito.
@@ -58,7 +62,7 @@ src/ui/class-sidebar.js  Draggable physical class window: cards, leaderboard sor
 src/ui/teacher-panel.js  Settings drawer: mic card, sensitivity, popovers (balls/scale, sound, backup, PWA install)
 src/ui/popover.js        openPopover / closePopover / getOpenPopover / escapeHtml — one popover at a time
 src/ui/icons.js          All SVG icons and theme preview illustrations
-src/styles/main.css      Friendly Arcade tokens + light-room overrides, HUD, sidebar, panel, popovers
+src/styles/main.css      imports friendly-arcade/tokens.css, app aliases, HUD, sidebar, panel, popovers
 ```
 
 ### State (`localStorage['tyhyi-klas:v1']`)
