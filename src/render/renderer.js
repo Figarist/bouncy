@@ -10,9 +10,10 @@ import { drawBlox } from './themes/blox.js';
 import { drawBrawl } from './themes/brawl.js';
 import { drawCapy } from './themes/capy.js';
 import { drawSweet } from './themes/sweets.js';
+import { drawElement } from './themes/elements.js';
 import { ParticleSystem } from '../world/particles.js';
 
-const ZZZ_THEMES = new Set(['critters', 'emoji', 'craft', 'blox', 'brawl', 'capy', 'sweets']);
+const ZZZ_THEMES = new Set(['critters', 'emoji', 'craft', 'blox', 'brawl', 'capy', 'sweets', 'elements']);
 
 export class CanvasRenderer {
   /**
@@ -165,6 +166,9 @@ export class CanvasRenderer {
           break;
         case 'sweets':
           drawSweet(ctx, ball);
+          break;
+        case 'elements':
+          drawElement(ctx, ball);
           break;
         case 'plastic':
           drawPlastic(ctx, ball);
