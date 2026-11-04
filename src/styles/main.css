@@ -3,51 +3,12 @@
 @import '@fontsource/nunito/cyrillic-700.css';
 @import '@fontsource/nunito/latin-700.css';
 
-:root {
-  /* Friendly Arcade tokens (github.com/Figarist/friendly-arcade), Midnight Arcade palette */
-  --bg: #1A1A2E;
-  --bg2: #16213E;
-  --surface: #0F3460;
-  --surface2: #1A4080;
-  --card: #1E3A5F;
-  --card-hover: #264D73;
-  --border: rgba(255, 255, 255, 0.12);
-  --border-strong: rgba(255, 255, 255, 0.24);
-  --border-focus: #00D2FF;
+/* Design tokens come from the Friendly Arcade package (pinned tag in package.json):
+   dark Midnight Arcade in :root, light theme in [data-theme="light"] (set on <html> with body.light-room). */
+@import 'friendly-arcade/tokens.css';
 
-  --green: #00D26A;
-  --on-green: #06210F;
-  --yellow: #FFC312;
-  --on-yellow: #261B00;
-  --red: #C02937;
-  --red-bright: #FF4757;
-  --cyan: #00D2FF;
-  --on-cyan: #061E38;
-  --purple: #A855F7;
-  --orange: #FF6B35;
-
-  --text: #FFFFFF;
-  --text2: #C3DCFF;
-  --text-muted: #8DA6CC;
-
-  --r-xs: 6px;
-  --r-sm: 10px;
-  --r-md: 16px;
-  --r-lg: 24px;
-  --r-pill: 999px;
-
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
-  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.35);
-  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.5);
-  --shadow-glow-green: 0 4px 20px rgba(0, 210, 106, 0.35);
-  --shadow-glow-yellow: 0 0 20px rgba(255, 195, 18, 0.3);
-  --ease-smooth: cubic-bezier(0.25, 0.8, 0.25, 1);
-  --ease-bounce: cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  --duration-fast: 0.15s;
-}
-
-/* App names mapped onto the arcade tokens. Declared on body (not :root) so they resolve
-   against body.light-room overrides instead of freezing the dark values. */
+/* App names mapped onto the arcade tokens. Declared on body (below <html data-theme>) so they
+   resolve against the light theme instead of freezing the dark values. */
 body {
   /* App names, mapped onto the arcade tokens */
   --bg-top: var(--bg);
@@ -84,28 +45,11 @@ body {
   --font-mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
 }
 
-/* Light Classroom / Bright Projector Theme: same arcade accents on white tiles */
+/* Light Classroom / Bright Projector Theme: the package's light tokens plus darker status text */
 body.light-room {
-  --bg: #F1F5FB;
-  --bg2: #FFFFFF;
-  --surface: #FFFFFF;
-  --surface2: #B9C8E0;
-  --card: #F4F7FC;
-  --card-hover: #E6EDF8;
-  --border: rgba(15, 23, 42, 0.14);
-  --border-strong: rgba(15, 23, 42, 0.28);
-  --border-focus: #0077B6;
-  --text: #0F172A;
-  --text2: #334155;
-  --text-muted: #475569;
-
-  --shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.08);
-  --shadow-md: 0 6px 20px rgba(15, 23, 42, 0.1);
-  --shadow-lg: 0 16px 40px rgba(15, 23, 42, 0.16);
-
-  --status-green: #047857;
-  --status-yellow: #B45309;
-  --status-red: #B91C1C;
+  --status-green: var(--ok-text);
+  --status-yellow: var(--warn-text);
+  --status-red: var(--danger-text);
 }
 
 body.light-room .intro-overlay {
