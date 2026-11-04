@@ -30,7 +30,8 @@ export function getOpenPopover() {
 
 /**
  * @param {object} opts
- * @param {HTMLElement} opts.anchor  element the popover points at
+ * @param {HTMLElement | (() => HTMLElement)} opts.anchor  element the popover points at, or a getter
+ *   for anchors that get re-rendered while the popover is open
  * @param {string} opts.title
  * @param {string} opts.html         body markup
  * @param {'right'|'left'|'below'} [opts.side='right']
@@ -53,16 +54,20 @@ export function openPopover({ anchor, title, html, side = 'right', onMount, onCl
     <div class="popover-body">${html}</div>
   `;
   document.body.appendChild(el);
-  position(el, anchor, side);
+  const getAnchor = typeof anchor === 'function' ? anchor : () => anchor;
+  position(el, getAnchor(), side);
 
   const onDocDown = (e) => {
-    if (el.contains(e.target) || anchor.contains(e.target)) return;
+    if (el.contains(e.target) || getAnchor()?.contains(e.target)) return;
     closePopover();
   };
   const onKey = (e) => {
     if (e.key === 'Escape') closePopover();
   };
-  const onResize = () => position(el, anchor, side);
+  const onResize = () => {
+    const a = getAnchor();
+    if (a?.isConnected) position(el, a, side);
+  };
   // Defer so the click that opened the popover does not close it immediately
   setTimeout(() => document.addEventListener('pointerdown', onDocDown), 0);
   document.addEventListener('keydown', onKey);

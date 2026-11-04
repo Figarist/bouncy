@@ -3,6 +3,11 @@ import { CONFIG } from '../config.js';
 
 const MAX_SUBSTEP_SPEED = 24;
 const RESTING_VELOCITY_THRESHOLD = 0.65;
+// Spatial hash cell per ball radius: two touching rotated cubes reach 2 × ~1.18R apart, so cells
+// must cover 2.36R or neighbouring pairs get missed at large ball scales.
+const CELL_SIZE_PER_RADIUS = 2.4;
+// Sidebar moves farther than this in one frame only when it jumps (restore, collapse), never when dragged.
+const SIDEBAR_TELEPORT_PX = 200;
 
 export class PhysicsWorld {
   constructor() {
@@ -73,7 +78,7 @@ export class PhysicsWorld {
     const baseR = this.calcBaseRadius(this.targetCount);
     const effectiveR = Math.max(6, Math.round(baseR * this.ballScale));
 
-    this.cellSize = Math.max(70, Math.ceil(effectiveR * 2.25));
+    this.cellSize = Math.max(70, Math.ceil(effectiveR * CELL_SIZE_PER_RADIUS));
 
     const effectiveRight = this.rightWallObstacle && typeof this.rightWallObstacle.x === 'number'
       ? Math.max(120, Math.min(this.width, this.rightWallObstacle.x))
@@ -119,7 +124,7 @@ export class PhysicsWorld {
     this.targetCount = target;
 
     const effectiveR = radius || Math.max(6, Math.round(this.calcBaseRadius(target) * this.ballScale));
-    this.cellSize = Math.max(70, Math.ceil(effectiveR * 2.25));
+    this.cellSize = Math.max(70, Math.ceil(effectiveR * CELL_SIZE_PER_RADIUS));
 
     const effectiveRight = this.rightWallObstacle && typeof this.rightWallObstacle.x === 'number'
       ? Math.max(120, Math.min(this.width, this.rightWallObstacle.x))
@@ -292,13 +297,23 @@ export class PhysicsWorld {
     );
 
     const obsEnd = this.sidebarObstacle;
-    const obsStart = this.prevSidebarRect || obsEnd;
+    // A collapse/expand or a restored position changes the rect in one frame: that is a teleport,
+    // not motion, so it must not shove nearby balls at full speed.
+    const prev = this.prevSidebarRect;
+    const teleported = prev && obsEnd && (
+      Math.abs((obsEnd.right - obsEnd.left) - (prev.right - prev.left)) > 1 ||
+      Math.abs((obsEnd.bottom - obsEnd.top) - (prev.bottom - prev.top)) > 1 ||
+      Math.hypot(obsEnd.left - prev.left, obsEnd.top - prev.top) > SIDEBAR_TELEPORT_PX
+    );
+    const obsStart = (!teleported && prev) || obsEnd;
 
     // Compute per-substep sidebar velocity in Verlet substep units (px / substep)
     let sidebarSubVx = 0;
     let sidebarSubVy = 0;
     if (obsEnd) {
-      if (this.prevSidebarRect) {
+      if (teleported) {
+        // no carry-over velocity
+      } else if (prev) {
         const dxCenter = ((obsEnd.left + obsEnd.right) - (obsStart.left + obsStart.right)) * 0.5;
         const dyCenter = ((obsEnd.top + obsEnd.bottom) - (obsStart.top + obsStart.bottom)) * 0.5;
         sidebarSubVx = dxCenter / subSteps;
