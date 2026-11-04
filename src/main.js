@@ -25,6 +25,7 @@ import { getOpenPopover } from './ui/popover.js';
 import { HotkeyManager } from './ui/hotkeys.js';
 import { IntroOverlay } from './ui/intro.js';
 import { iconLab } from './ui/icons.js';
+import { initServiceWorker } from './ui/update-notice.js';
 
 class GameApp {
   constructor() {
@@ -458,13 +459,24 @@ class GameApp {
     this.requestWakeLock();
   }
 
+  // The browser drops the lock whenever the tab is hidden or the projector input switches,
+  // so it is taken again on every return to the tab while the lesson runs.
   async requestWakeLock() {
-    if ('wakeLock' in navigator) {
-      try {
-        await navigator.wakeLock.request('screen');
-      } catch {
-        // wakeLock might fail if unsupported or battery saver
-      }
+    if (!('wakeLock' in navigator)) return;
+    if (!this.onWakeLockVisibility) {
+      this.onWakeLockVisibility = () => {
+        if (document.visibilityState === 'visible' && !this.wakeLock) this.requestWakeLock();
+      };
+      document.addEventListener('visibilitychange', this.onWakeLockVisibility);
+    }
+    if (this.wakeLock || document.visibilityState !== 'visible') return;
+    try {
+      this.wakeLock = await navigator.wakeLock.request('screen');
+      this.wakeLock.addEventListener('release', () => {
+        this.wakeLock = null;
+      });
+    } catch {
+      // Unsupported, battery saver or no user activation yet: the next visibility change retries
     }
   }
 
@@ -820,6 +832,8 @@ class GameApp {
     this.hud.updateTimer(timerRes.remaining, timerRes.running, this.session.timerTotalSeconds);
   }
 }
+
+initServiceWorker();
 
 window.addEventListener('DOMContentLoaded', () => {
   new GameApp();

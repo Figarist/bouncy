@@ -90,7 +90,7 @@
 
 ```text
 bouncy/
-├── index.html                  # Точка входу + JSON-LD Schema.org та PWA-реєстрація
+├── index.html                  # Точка входу + JSON-LD Schema.org
 ├── public/                     # Статичні файли PWA (manifest.webmanifest, sw.js, icon.svg, icon-192/512.png)
 ├── scripts/
 │   └── serve-test.mjs          # Автономний локальний HTTP-сервер для тестування збірки з ?debug

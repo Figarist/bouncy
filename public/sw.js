@@ -19,9 +19,15 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.map((k) => (k !== CACHE_NAME ? caches.delete(k) : undefined)))
-    ).then(() => self.clients.claim())
+    caches.keys().then(async (keys) => {
+      const old = keys.filter((k) => k !== CACHE_NAME);
+      await Promise.all(old.map((k) => caches.delete(k)));
+      await self.clients.claim();
+      // Only an update replaces an older app cache; the very first install stays silent
+      if (!old.some((k) => k.startsWith('tyhyi-klas-'))) return;
+      const pages = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      pages.forEach((page) => page.postMessage({ type: 'sw-updated', assets: CORE_ASSETS }));
+    })
   );
 });
 
