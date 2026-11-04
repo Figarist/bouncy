@@ -4,57 +4,108 @@
 @import '@fontsource/nunito/latin-700.css';
 
 :root {
-  --bg-top: #0F122B;
-  --bg-bottom: #25133E;
-  --ink: #FFF7E8;
-  --muted: #A9A6D6;
-  --zone-green: #3DDC97;
-  --zone-yellow: #FFC94A;
-  --zone-red: #FF5C7A;
+  /* Friendly Arcade tokens (github.com/Figarist/friendly-arcade), Midnight Arcade palette */
+  --bg: #1A1A2E;
+  --bg2: #16213E;
+  --surface: #0F3460;
+  --surface2: #1A4080;
+  --card: #1E3A5F;
+  --card-hover: #264D73;
+  --border: rgba(255, 255, 255, 0.12);
+  --border-strong: rgba(255, 255, 255, 0.24);
+  --border-focus: #00D2FF;
+
+  --green: #00D26A;
   --on-green: #06210F;
+  --yellow: #FFC312;
   --on-yellow: #261B00;
-  --status-green: #3DDC97;
-  --status-yellow: #FFC94A;
-  --status-red: #FF5C7A;
-  --star: #FFD43B;
+  --red: #C02937;
+  --red-bright: #FF4757;
+  --cyan: #00D2FF;
+  --on-cyan: #061E38;
+  --purple: #A855F7;
+  --orange: #FF6B35;
+
+  --text: #FFFFFF;
+  --text2: #C3DCFF;
+  --text-muted: #8DA6CC;
+
+  --r-xs: 6px;
+  --r-sm: 10px;
+  --r-md: 16px;
+  --r-lg: 24px;
+  --r-pill: 999px;
+
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.5);
+  --shadow-glow-green: 0 4px 20px rgba(0, 210, 106, 0.35);
+  --shadow-glow-yellow: 0 0 20px rgba(255, 195, 18, 0.3);
+  --ease-smooth: cubic-bezier(0.25, 0.8, 0.25, 1);
+  --ease-bounce: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  --duration-fast: 0.15s;
+}
+
+/* App names mapped onto the arcade tokens. Declared on body (not :root) so they resolve
+   against body.light-room overrides instead of freezing the dark values. */
+body {
+  /* App names, mapped onto the arcade tokens */
+  --bg-top: var(--bg);
+  --bg-bottom: var(--bg2);
+  --ink: var(--text);
+  --muted: var(--text2);
+  --zone-green: var(--green);
+  --zone-yellow: var(--yellow);
+  --zone-red: var(--red-bright);
+  --status-green: var(--green);
+  --status-yellow: var(--yellow);
+  --status-red: var(--red-bright);
+  --star: var(--yellow);
   --star-dark: #D97706;
-  --accent: #2563EB;
-  --panel: rgba(16, 15, 40, 0.94);
-  --panel-border: rgba(255, 255, 255, 0.14);
-  --btn-bg: rgba(255, 255, 255, 0.08);
-  --btn-hover: rgba(255, 255, 255, 0.15);
-  --card-bg: rgba(255, 255, 255, 0.05);
+  --accent: var(--green);
+  --panel: var(--bg2);
+  --panel-border: var(--surface2);
+  --btn-bg: var(--surface);
+  --btn-hover: var(--surface2);
+  --card-bg: var(--card);
 
-  /* Liquid Glass Tokens */
-  --glass-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0.04) 100%);
-  --glass-border: rgba(255, 255, 255, 0.24);
-  --glass-shadow: 0 8px 24px rgba(0, 0, 0, 0.32), inset 0 1px 1px rgba(255, 255, 255, 0.38), inset 0 -1px 1px rgba(255, 255, 255, 0.08);
-  --glass-pill-active: linear-gradient(180deg, rgba(59, 130, 246, 0.92) 0%, rgba(29, 78, 216, 0.95) 100%);
-  --glass-pill-shadow: 0 4px 14px rgba(37, 99, 235, 0.45), inset 0 1.5px 1px rgba(255, 255, 255, 0.65), inset 0 -1px 2px rgba(15, 23, 42, 0.35);
+  /* HUD and window surfaces: solid tiles with a thick engineering border */
+  --glass-bg: var(--surface);
+  --glass-border: var(--surface2);
+  --glass-shadow: var(--shadow-md);
+  --glass-pill-active: var(--green);
+  --glass-pill-shadow: var(--shadow-glow-green);
+  --on-pill-active: var(--on-green);
+}
 
+:root {
   --font-display: 'Rubik', sans-serif;
   --font-ui: 'Nunito', sans-serif;
   --font-mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
 }
 
-/* Light Classroom / Bright Projector Theme (Strict WCAG AAA contrast) */
+/* Light Classroom / Bright Projector Theme: same arcade accents on white tiles */
 body.light-room {
-  --bg-top: #F8FAFC;
-  --bg-bottom: #E2E8F0;
-  --ink: #0F172A;
-  --muted: #475569;
+  --bg: #F1F5FB;
+  --bg2: #FFFFFF;
+  --surface: #FFFFFF;
+  --surface2: #B9C8E0;
+  --card: #F4F7FC;
+  --card-hover: #E6EDF8;
+  --border: rgba(15, 23, 42, 0.14);
+  --border-strong: rgba(15, 23, 42, 0.28);
+  --border-focus: #0077B6;
+  --text: #0F172A;
+  --text2: #334155;
+  --text-muted: #475569;
+
+  --shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.08);
+  --shadow-md: 0 6px 20px rgba(15, 23, 42, 0.1);
+  --shadow-lg: 0 16px 40px rgba(15, 23, 42, 0.16);
+
   --status-green: #047857;
   --status-yellow: #B45309;
   --status-red: #B91C1C;
-  --panel: rgba(255, 255, 255, 0.95);
-  --panel-border: rgba(15, 23, 42, 0.15);
-  --btn-bg: rgba(15, 23, 42, 0.06);
-  --btn-hover: rgba(15, 23, 42, 0.12);
-  --card-bg: rgba(15, 23, 42, 0.04);
-
-  --glass-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.85) 0%, rgba(241, 245, 249, 0.72) 100%);
-  --glass-border: rgba(15, 23, 42, 0.16);
-  --glass-shadow: 0 6px 20px rgba(15, 23, 42, 0.08), inset 0 1px 1px rgba(255, 255, 255, 0.9);
 }
 
 body.light-room .intro-overlay {
@@ -95,6 +146,24 @@ html, body {
   transition: background-color 0.25s, color 0.25s;
 }
 
+/* Friendly Arcade: bright keyboard focus ring on every control */
+:focus-visible {
+  outline: 3px solid var(--border-focus);
+  outline-offset: 2px;
+}
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Calm the screen for motion-sensitive kids: no shake, no springy pops */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 body.hide-cursor {
   cursor: none;
 }
@@ -132,13 +201,12 @@ body.screen-shake .hud-top {
 }
 
 /* ==========================================================================
-   LIQUID GLASS DESIGN SYSTEM (Multi-layered Specular Refraction)
+   ARCADE SURFACES (Friendly Arcade: solid tiles, 2-3px borders, pill controls)
+   The .liquid-glass-* class names are kept so the UI modules need no markup changes.
    ========================================================================== */
 .liquid-glass-surface {
   background: var(--glass-bg);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid var(--glass-border);
+  border: 2px solid var(--glass-border);
   box-shadow: var(--glass-shadow);
 }
 
@@ -146,12 +214,10 @@ body.screen-shake .hud-top {
   display: inline-flex;
   align-items: center;
   background: var(--glass-bg);
-  backdrop-filter: blur(22px) saturate(190%);
-  -webkit-backdrop-filter: blur(22px) saturate(190%);
-  border: 1px solid var(--glass-border);
+  border: 2px solid var(--glass-border);
   box-shadow: var(--glass-shadow);
   padding: 0.4vmin;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   gap: 0.35vmin;
   position: relative;
 }
@@ -159,14 +225,14 @@ body.screen-shake .hud-top {
 .liquid-glass-tab {
   position: relative;
   background: transparent;
-  border: 1px solid transparent;
+  border: 2px solid transparent;
   color: var(--muted);
   font-family: var(--font-display);
   font-size: 1.7vmin;
   padding: 0.7vmin 1.8vmin;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   cursor: pointer;
-  transition: all 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: background var(--duration-fast) var(--ease-smooth), color 0.15s, transform 0.15s var(--ease-bounce);
   white-space: nowrap;
   display: inline-flex;
   align-items: center;
@@ -176,15 +242,18 @@ body.screen-shake .hud-top {
 
 .liquid-glass-tab:hover {
   color: var(--ink);
-  background: rgba(255, 255, 255, 0.09);
+  background: var(--card-hover);
+}
+
+.liquid-glass-tab:active {
+  transform: scale(0.96);
 }
 
 .liquid-glass-tab.active {
   background: var(--glass-pill-active);
-  color: #FFFFFF;
-  border-color: rgba(255, 255, 255, 0.38);
+  color: var(--on-pill-active);
+  border-color: var(--glass-pill-active);
   box-shadow: var(--glass-pill-shadow);
-  transform: translateY(-0.5px);
 }
 
 /* Panel variant of Liquid Glass pillbars */
@@ -192,7 +261,7 @@ body.screen-shake .hud-top {
   display: flex;
   width: 100%;
   padding: 3px;
-  border-radius: 12px;
+  border-radius: var(--r-pill);
   gap: 4px;
 }
 
@@ -201,8 +270,9 @@ body.screen-shake .hud-top {
   font-family: var(--font-ui);
   font-size: 12px;
   font-weight: 800;
+  min-height: 40px;
   padding: 6px 6px;
-  border-radius: 9px;
+  border-radius: var(--r-pill);
 }
 
 /* HUD Container in TV Safe Area */
@@ -477,10 +547,10 @@ body.light-room .ring-bg {
   top: 40%;
   left: 50%;
   transform: translate(-50%, -50%) scale(1);
-  background: var(--zone-red);
+  background: var(--red);
   color: #FFFFFF;
   padding: 2.8vmin 7vmin;
-  border-radius: 2.4vmin;
+  border-radius: var(--r-lg);
   border: 3px solid rgba(255, 255, 255, 0.45);
   font-family: var(--font-display);
   font-size: 7.5vmin;
@@ -528,16 +598,17 @@ body.light-room .ring-bg {
   bottom: 3vmin;
   left: 50%;
   transform: translateX(-50%);
-  background: #DC2626;
+  background: var(--red);
   color: #FFFFFF;
   padding: 1.4vmin 2.4vmin;
-  border-radius: 1.2vmin;
+  border-radius: var(--r-md);
   z-index: 150;
   display: flex;
   align-items: center;
   gap: 1.6vmin;
   max-width: 640px;
   pointer-events: auto;
+  border: 2px solid rgba(255, 255, 255, 0.35);
 }
 .toast-content {
   display: flex;
@@ -573,8 +644,8 @@ body.light-room .ring-bg {
 }
 .goal-modal-card {
   background: var(--panel);
-  border: 2px solid var(--star);
-  border-radius: 2vmin;
+  border: 3px solid var(--star);
+  border-radius: var(--r-lg);
   padding: 3.5vmin 5vmin;
   max-width: 500px;
   text-align: center;
@@ -582,6 +653,7 @@ body.light-room .ring-bg {
   flex-direction: column;
   align-items: center;
   gap: 1.4vmin;
+  box-shadow: var(--shadow-lg), var(--shadow-glow-yellow);
 }
 .goal-modal-card h2 {
   font-family: var(--font-display);
@@ -613,23 +685,26 @@ body.light-room .ring-bg {
   flex: 1;
   font-family: var(--font-ui);
   font-size: 1.7vmin;
-  font-weight: 700;
+  font-weight: 800;
   padding: 1.2vmin;
-  border-radius: 1vmin;
+  border-radius: var(--r-pill);
   cursor: pointer;
-  border: none;
+  border: 2px solid transparent;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.8vmin;
+  min-height: 48px;
 }
 .goal-action-btn.primary {
-  background: var(--accent);
-  color: #FFFFFF;
+  background: var(--green);
+  color: var(--on-green);
+  border-color: var(--green);
+  box-shadow: var(--shadow-glow-green);
 }
 .goal-action-btn.secondary {
   background: var(--btn-bg);
-  border: 1px solid var(--panel-border);
+  border: 2px solid var(--panel-border);
   color: var(--ink);
 }
 
@@ -642,9 +717,7 @@ body.light-room .ring-bg {
   max-width: 92vw;
   height: 100vh;
   background: var(--panel);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border-left: 1px solid var(--panel-border);
+  border-left: 3px solid var(--panel-border);
   z-index: 100;
   display: flex;
   flex-direction: column;
@@ -681,7 +754,9 @@ body.light-room .ring-bg {
   align-items: center;
   justify-content: center;
   padding: 4px;
-  border-radius: 6px;
+  border-radius: var(--r-pill);
+  min-width: 36px;
+  min-height: 36px;
 }
 .panel-close-btn:hover {
   background: var(--btn-hover);
@@ -708,32 +783,34 @@ body.light-room .ring-bg {
 
 .action-btn {
   flex: 1;
-  background: var(--accent);
-  border: none;
-  color: #FFFFFF;
+  background: var(--green);
+  border: 2px solid var(--green);
+  color: var(--on-green);
   font-family: var(--font-ui);
   font-size: 13px;
-  font-weight: 700;
-  padding: 8px 10px;
-  border-radius: 8px;
+  font-weight: 800;
+  padding: 8px 14px;
+  border-radius: var(--r-pill);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
   transition: filter 0.15s;
+  min-height: 44px;
 }
 .action-btn:hover {
   filter: brightness(1.08);
 }
 .action-btn.secondary {
   background: var(--btn-bg);
-  border: 1px solid var(--panel-border);
+  border: 2px solid var(--panel-border);
   color: var(--ink);
 }
 .action-btn.active {
-  background: var(--zone-red);
+  background: var(--red);
   color: #FFFFFF;
+  border-color: var(--red);
 }
 .action-btn.full-width {
   width: 100%;
@@ -745,15 +822,16 @@ body.light-room .ring-bg {
 
 .select-input {
   background: var(--card-bg);
-  border: 1px solid var(--panel-border);
+  border: 2px solid var(--panel-border);
   color: var(--ink);
   font-family: var(--font-ui);
   font-size: 12px;
   padding: 7px 10px;
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   outline: none;
   cursor: pointer;
   width: 100%;
+  min-height: 44px;
 }
 .select-input:focus {
   border-color: var(--accent);
@@ -763,8 +841,8 @@ body.light-room .ring-bg {
 /* Live VU Meter telemetry widget */
 .mic-test-wrap {
   background: var(--card-bg);
-  border: 1px solid var(--panel-border);
-  border-radius: 8px;
+  border: 2px solid var(--panel-border);
+  border-radius: var(--r-md);
   padding: 8px 10px;
   display: flex;
   flex-direction: column;
@@ -857,8 +935,8 @@ body.light-room .ring-bg {
 }
 .theme-card {
   background: var(--card-bg);
-  border: 1px solid var(--panel-border);
-  border-radius: 9px;
+  border: 2px solid var(--panel-border);
+  border-radius: var(--r-md);
   padding: 5px 8px;
   display: flex;
   align-items: center;
@@ -867,14 +945,15 @@ body.light-room .ring-bg {
   color: var(--ink);
   transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
   text-align: left;
+  min-height: 44px;
 }
 .theme-card:hover {
   background: var(--btn-hover);
 }
 .theme-card.active {
-  background: rgba(37, 99, 235, 0.22);
-  border-color: #60A5FA;
-  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.25);
+  background: var(--card-hover);
+  border-color: var(--green);
+  box-shadow: var(--shadow-glow-green);
 }
 .theme-card-icon {
   flex-shrink: 0;
@@ -903,14 +982,15 @@ body.light-room .ring-bg {
 }
 .chip-btn {
   background: var(--btn-bg);
-  border: 1px solid var(--panel-border);
+  border: 2px solid var(--panel-border);
   color: var(--ink);
   padding: 5px 12px;
-  border-radius: 7px;
+  border-radius: var(--r-pill);
   cursor: pointer;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
+  min-height: 44px;
 }
 .chip-btn:hover {
   background: var(--btn-hover);
@@ -927,9 +1007,11 @@ body.light-room .ring-bg {
   color: var(--muted);
   cursor: pointer;
   padding: 3px 5px;
-  border-radius: 5px;
+  border-radius: var(--r-pill);
   display: inline-flex;
   align-items: center;
+  min-width: 36px;
+  min-height: 36px;
 }
 .icon-danger-btn:hover {
   color: var(--status-red);
@@ -946,8 +1028,8 @@ body.light-room .ring-bg {
 
 .stat-cell {
   background: var(--card-bg);
-  border: 1px solid var(--panel-border);
-  border-radius: 8px;
+  border: 2px solid var(--panel-border);
+  border-radius: var(--r-sm);
   padding: 6px 6px;
   display: flex;
   flex-direction: column;
@@ -985,7 +1067,7 @@ body.light-room .ring-bg {
   font-size: 9px;
   font-weight: 800;
   padding: 1px 4px;
-  border-radius: 4px;
+  border-radius: var(--r-pill);
 }
 
 .stat-lbl {
@@ -995,15 +1077,16 @@ body.light-room .ring-bg {
 }
 
 .num-input, .text-input {
-  background: var(--btn-bg);
-  border: 1px solid var(--panel-border);
+  background: var(--card-bg);
+  border: 2px solid var(--panel-border);
   color: var(--ink);
   padding: 6px 8px;
-  border-radius: 7px;
+  border-radius: var(--r-sm);
   font-family: var(--font-ui);
   font-size: 12px;
   outline: none;
   font-variant-numeric: tabular-nums;
+  min-height: 40px;
 }
 .num-input {
   width: 60px;
@@ -1017,11 +1100,11 @@ body.light-room .ring-bg {
 
 /* High-contrast WCAG AAA gold button (--on-yellow on solid --star) */
 .chip-btn-gold {
-  background: var(--star);
-  border: 1px solid var(--star-dark);
+  background: var(--yellow);
+  border: 2px solid var(--yellow);
   color: var(--on-yellow);
   padding: 5px 10px;
-  border-radius: 7px;
+  border-radius: var(--r-pill);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -1029,6 +1112,9 @@ body.light-room .ring-bg {
   font-family: var(--font-display);
   font-size: 12px;
   margin-left: auto;
+  min-height: 40px;
+  font-weight: 800;
+  box-shadow: var(--shadow-glow-yellow);
 }
 .chip-btn-gold:hover {
   filter: brightness(1.06);
@@ -1054,7 +1140,7 @@ body.light-room .ring-bg {
 .intro-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(12, 14, 38, 0.92);
+  background: rgba(26, 26, 46, 0.92);
   z-index: 200;
   display: flex;
   align-items: center;
@@ -1068,15 +1154,16 @@ body.light-room .ring-bg {
 
 .intro-card {
   background: var(--panel);
-  border: 1px solid var(--panel-border);
+  border: 3px solid var(--panel-border);
   padding: 3.5vmin 5vmin;
-  border-radius: 2.2vmin;
+  border-radius: var(--r-lg);
   text-align: center;
   max-width: 600px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 1.6vmin;
+  box-shadow: var(--shadow-lg);
 }
 
 .intro-critter-stage {
@@ -1098,9 +1185,9 @@ body.light-room .ring-bg {
 
 /* Strict WCAG AAA green button (--on-green on --zone-green) */
 .intro-start-btn {
-  background: var(--zone-green);
+  background: var(--green);
   color: var(--on-green);
-  border: none;
+  border: 2px solid var(--green);
   font-family: var(--font-display);
   font-size: 2.6vmin;
   padding: 1.4vmin 5vmin;
@@ -1111,6 +1198,7 @@ body.light-room .ring-bg {
   align-items: center;
   gap: 1vmin;
   margin-top: 0.4vmin;
+  box-shadow: var(--shadow-glow-green);
 }
 .intro-start-btn:hover {
   transform: scale(1.04);
@@ -1134,7 +1222,7 @@ body.light-room .ring-bg {
   gap: 0.8vmin;
 }
 .hint-item svg {
-  color: var(--accent);
+  color: var(--cyan);
 }
 
 /* Debug Simulator Bar (?debug) */
@@ -1195,7 +1283,7 @@ body.light-room .ring-bg {
   font-family: var(--font-display);
   font-size: 1.7vmin;
   padding: 1vmin 1.8vmin;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   cursor: pointer;
   transition: transform 0.15s;
 }
@@ -1226,7 +1314,7 @@ body.light-room .ring-bg {
   top: calc(1.8vmin + 7.4vmin);
   width: clamp(230px, 21vw, 360px);
   max-height: calc(100vh - 20vmin);
-  border-radius: 20px;
+  border-radius: var(--r-lg);
   padding: 12px;
   /* Below the HUD layer (z 10), so alerts and the goal modal cover the sidebar.
      The HUD container itself is pointer-events: none, so cards stay clickable. */
@@ -1243,7 +1331,7 @@ body.light-room .ring-bg {
 .class-sidebar.window-dragging {
   cursor: grabbing;
   transition: none !important;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.48), 0 0 0 2px rgba(59, 130, 246, 0.6);
+  box-shadow: var(--shadow-lg), 0 0 0 3px var(--cyan);
 }
 
 .sidebar-head {
@@ -1268,15 +1356,16 @@ body.light-room .ring-bg {
   color: var(--muted);
   cursor: pointer;
   width: 32px;
-  height: 32px;
-  border-radius: 8px;
+  height: 36px;
+  border-radius: var(--r-pill);
   display: flex;
   align-items: center;
   justify-content: center;
+  min-width: 36px;
 }
 .sidebar-head-btn.active {
   color: var(--on-yellow);
-  background: var(--star);
+  background: var(--yellow);
 }
 .sidebar-head-btn:hover {
   background: var(--btn-hover);
@@ -1325,20 +1414,20 @@ body.light-room .sidebar-list::-webkit-scrollbar-thumb:hover {
 .class-card {
   --class-color: #3B82F6;
   position: relative;
-  border-radius: 14px;
-  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  border: 2px solid var(--panel-border);
   border-left: 6px solid var(--class-color);
   background: var(--card-bg);
   transition: background 0.18s, border-color 0.18s, box-shadow 0.18s;
 }
 .class-card:hover {
-  background: var(--btn-hover);
+  background: var(--card-hover);
 }
 .class-card.active {
   background: rgba(37, 99, 235, 0.24);
   background: color-mix(in srgb, var(--class-color) 26%, transparent);
   border-color: var(--class-color);
-  box-shadow: 0 4px 18px color-mix(in srgb, var(--class-color) 35%, transparent), inset 0 1px 1px rgba(255, 255, 255, 0.25);
+  box-shadow: 0 4px 18px color-mix(in srgb, var(--class-color) 35%, transparent);
 }
 body.light-room .class-card.active {
   background: color-mix(in srgb, var(--class-color) 14%, transparent);
@@ -1467,11 +1556,11 @@ body.light-room .class-card.active {
   position: absolute;
   top: 6px;
   right: 6px;
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-pill);
   background: var(--btn-bg);
-  border: 1px solid var(--panel-border);
+  border: 2px solid var(--panel-border);
   color: var(--ink);
   cursor: pointer;
   display: flex;
@@ -1486,8 +1575,8 @@ body.light-room .class-card.active {
   opacity: 1;
 }
 .class-card-edit:hover {
-  background: var(--accent);
-  color: #FFFFFF;
+  background: var(--green);
+  color: var(--on-green);
 }
 @media (hover: none) {
   .class-card-edit {
@@ -1501,14 +1590,15 @@ body.light-room .class-card.active {
   justify-content: center;
   gap: 6px;
   background: none;
-  border: 1px dashed var(--panel-border);
+  border: 2px dashed var(--panel-border);
   color: var(--muted);
-  border-radius: 12px;
+  border-radius: var(--r-md);
   padding: 8px;
   font-family: var(--font-ui);
   font-weight: 700;
   font-size: 13px;
   cursor: pointer;
+  min-height: 44px;
 }
 .sidebar-add-btn:hover {
   color: var(--ink);
@@ -1524,15 +1614,16 @@ body.light-room .class-card.active {
   min-width: 0;
 }
 .sidebar-add-ok {
-  background: var(--accent);
-  color: #FFFFFF;
+  background: var(--green);
+  color: var(--on-green);
   border: none;
-  border-radius: 7px;
+  border-radius: var(--r-pill);
   width: 34px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  font-weight: 800;
 }
 
 /* Collapsed rail: just names and stars */
@@ -1583,11 +1674,9 @@ body.light-room .class-card.active {
   max-height: calc(100vh - 24px);
   overflow-y: auto;
   background: var(--panel);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid var(--panel-border);
-  border-radius: 16px;
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+  border: 3px solid var(--panel-border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-lg);
   color: var(--ink);
   pointer-events: auto;
   animation: popoverIn 0.18s cubic-bezier(0.22, 1, 0.36, 1);
@@ -1617,8 +1706,11 @@ body.light-room .popover {
   color: var(--muted);
   cursor: pointer;
   padding: 4px;
-  border-radius: 6px;
+  border-radius: var(--r-pill);
   display: flex;
+  min-width: 36px;
+  min-height: 36px;
+  justify-content: center;
 }
 .popover-close:hover {
   background: var(--btn-hover);
@@ -1684,11 +1776,11 @@ select {
   text-align: center;
 }
 .stepper-btn {
-  width: 28px;
-  height: 30px;
-  border-radius: 7px;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-pill);
   background: var(--btn-bg);
-  border: 1px solid var(--panel-border);
+  border: 2px solid var(--panel-border);
   color: var(--ink);
   font-size: 16px;
   font-weight: 800;
@@ -1703,8 +1795,8 @@ select {
   align-items: center;
   justify-content: space-between;
   background: var(--card-bg);
-  border: 1px solid var(--panel-border);
-  border-radius: 10px;
+  border: 2px solid var(--panel-border);
+  border-radius: var(--r-md);
   padding: 8px 10px;
 }
 .jar-now-count {
@@ -1732,20 +1824,23 @@ select {
 }
 .choice-btn {
   background: var(--card-bg);
-  border: 1px solid var(--panel-border);
+  border: 2px solid var(--panel-border);
   color: var(--ink);
-  border-radius: 9px;
+  border-radius: var(--r-pill);
   padding: 9px 6px;
   font-family: var(--font-display);
   font-size: 13px;
   cursor: pointer;
+  min-height: 44px;
+  font-weight: 800;
 }
 .choice-btn:hover {
   background: var(--btn-hover);
 }
 .choice-btn.active {
-  background: rgba(37, 99, 235, 0.24);
-  border-color: #60A5FA;
+  background: var(--green);
+  border-color: var(--green);
+  color: var(--on-green);
 }
 
 .profile-list {
@@ -1759,12 +1854,13 @@ select {
   gap: 10px;
   text-align: left;
   background: var(--card-bg);
-  border: 1px solid var(--panel-border);
+  border: 2px solid var(--panel-border);
   color: var(--ink);
-  border-radius: 10px;
+  border-radius: var(--r-md);
   padding: 8px 10px;
   cursor: pointer;
   font-family: var(--font-ui);
+  min-height: 44px;
 }
 .profile-row span {
   display: flex;
@@ -1781,8 +1877,8 @@ select {
   background: var(--btn-hover);
 }
 .profile-row.active {
-  background: rgba(37, 99, 235, 0.24);
-  border-color: #60A5FA;
+  background: var(--card-hover);
+  border-color: var(--green);
 }
 
 .help-steps {
@@ -1821,8 +1917,8 @@ kbd {
    ========================================================================== */
 .panel-card {
   background: var(--card-bg);
-  border: 1px solid var(--panel-border);
-  border-radius: 14px;
+  border: 2px solid var(--panel-border);
+  border-radius: var(--r-md);
   padding: 12px;
   display: flex;
   flex-direction: column;
@@ -1890,8 +1986,8 @@ kbd {
 
 .panel-list {
   background: var(--card-bg);
-  border: 1px solid var(--panel-border);
-  border-radius: 14px;
+  border: 2px solid var(--panel-border);
+  border-radius: var(--r-md);
   overflow: hidden;
 }
 
@@ -1908,6 +2004,7 @@ kbd {
   cursor: pointer;
   text-align: left;
   font-family: var(--font-ui);
+  min-height: 48px;
 }
 .list-row:last-child {
   border-bottom: none;
@@ -1923,7 +2020,7 @@ kbd {
   width: 32px;
   height: 32px;
   flex-shrink: 0;
-  border-radius: 9px;
+  border-radius: var(--r-sm);
   background: var(--btn-bg);
   display: flex;
   align-items: center;
@@ -1955,7 +2052,7 @@ kbd {
   width: 42px;
   height: 24px;
   border-radius: 999px;
-  background: rgba(128, 128, 128, 0.4);
+  background: var(--surface2);
   position: relative;
   cursor: pointer;
   flex-shrink: 0;
@@ -1974,7 +2071,7 @@ kbd {
   transition: transform 0.18s;
 }
 .switch:checked {
-  background: var(--zone-green);
+  background: var(--green);
 }
 .switch:checked::after {
   transform: translateX(18px);
