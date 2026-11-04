@@ -3,6 +3,8 @@ import {
   createClassRecord,
   renameClassRecord,
   reorderClassRecord,
+  classNames,
+  normalizeState,
   rankClasses,
   recordPrize,
   nextClassColor,
@@ -38,16 +40,59 @@ describe('renameClassRecord', () => {
 });
 
 describe('reorderClassRecord', () => {
-  const classes = { A: createClassRecord(), B: createClassRecord(), C: createClassRecord() };
+  const names = ['A', 'B', 'C'];
 
   it('moves a class to a new position', () => {
-    expect(Object.keys(reorderClassRecord(classes, 'C', 0))).toEqual(['C', 'A', 'B']);
-    expect(Object.keys(reorderClassRecord(classes, 'A', 2))).toEqual(['B', 'C', 'A']);
-    expect(Object.keys(reorderClassRecord(classes, 'A', 99))).toEqual(['B', 'C', 'A']);
+    expect(reorderClassRecord(names, 'C', 0)).toEqual(['C', 'A', 'B']);
+    expect(reorderClassRecord(names, 'A', 2)).toEqual(['B', 'C', 'A']);
+    expect(reorderClassRecord(names, 'A', 99)).toEqual(['B', 'C', 'A']);
+    expect(names).toEqual(['A', 'B', 'C']);
   });
 
   it('returns null for an unknown class', () => {
-    expect(reorderClassRecord(classes, 'Z', 0)).toBeNull();
+    expect(reorderClassRecord(names, 'Z', 0)).toBeNull();
+  });
+});
+
+describe('classNames', () => {
+  it('keeps the saved order even for number-like names that JS objects sort first', () => {
+    const state = { classes: { 'Гурток': {}, 7: {}, '4-Б': {} }, classOrder: ['Гурток', '7', '4-Б'] };
+    expect(Object.keys(state.classes)[0]).toBe('7');
+    expect(classNames(state)).toEqual(['Гурток', '7', '4-Б']);
+  });
+
+  it('drops unknown names and appends classes missing from the order', () => {
+    expect(classNames({ classes: { A: {}, B: {} }, classOrder: ['Z', 'B'] })).toEqual(['B', 'A']);
+    expect(classNames({ classes: { A: {}, B: {} } })).toEqual(['A', 'B']);
+  });
+});
+
+describe('normalizeState', () => {
+  it('coerces hostile or string values from a backup into safe numbers', () => {
+    const s = normalizeState({
+      activeClass: 'Нема',
+      classes: {
+        A: { stars: '<img src=x onerror=alert(1)>', goal: '5', totalStars: -3, color: 'red;}</style>', prizeHistory: [{ reward: 1 }] },
+      },
+      settings: { sensitivity: '<b>', balls: '40', mode: 7, volume: 9, evil: 'x' },
+    });
+    const a = s.classes.A;
+    expect(a.stars).toBe(0);
+    expect(a.goal).toBe(20);
+    expect(a.totalStars).toBe(0);
+    expect(a.color).toBe(CLASS_COLORS[0]);
+    expect(a.prizeHistory).toEqual([]);
+    expect(s.activeClass).toBe('A');
+    expect(s.settings.sensitivity).toBe(0);
+    expect(s.settings.balls).toBe(40);
+    expect(s.settings.mode).toBe('quiet');
+    expect(s.settings.volume).toBe(1);
+    expect(s.settings).not.toHaveProperty('evil');
+  });
+
+  it('returns null without classes', () => {
+    expect(normalizeState({})).toBeNull();
+    expect(normalizeState({ classes: {} })).toBeNull();
   });
 });
 
@@ -135,6 +180,26 @@ describe('StorageManager snapshots & backups', () => {
     // Verify safety snapshot was created
     const snapsAfter = StorageManager.getSnapshots();
     expect(snapsAfter[0].label).toBe('Перед відновленням копії');
+  });
+
+  it('normalizes a broken snapshot on restore', () => {
+    localStorage.clear();
+    StorageManager.save({ activeClass: 'A', classes: { A: createClassRecord() }, settings: {} });
+    const snap = StorageManager.takeSnapshot({ activeClass: 'Нема', classes: { B: { stars: 4 } } }, 'Старий формат');
+    const restored = StorageManager.restoreSnapshot(snap.id);
+    expect(restored.activeClass).toBe('B');
+    expect(restored.classes.B.secondsPerStar).toBe(30);
+    expect(restored.classes.B.prizeHistory).toEqual([]);
+  });
+
+  it('refuses to import when the safety snapshot cannot be stored', () => {
+    const realSet = localStorage.setItem;
+    localStorage.setItem = () => {
+      throw new Error('QuotaExceededError');
+    };
+    const res = StorageManager.importBackup(JSON.stringify({ classes: { A: {} } }));
+    localStorage.setItem = realSet;
+    expect(res.success).toBe(false);
   });
 
   it('exports and imports backup JSON correctly and normalizes settings', () => {

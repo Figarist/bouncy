@@ -289,12 +289,12 @@ export class TeacherPanel {
     const rowPwa = this.panel.querySelector('#row-pwa-install');
     rowPwa?.addEventListener('click', async () => {
       if (this.deferredInstallPrompt) {
-        this.deferredInstallPrompt.prompt();
-        const choice = await this.deferredInstallPrompt.userChoice;
-        if (choice.outcome === 'accepted') {
-          this.deferredInstallPrompt = null;
-          rowPwa.style.display = 'none';
-        }
+        // The browser lets a saved prompt be shown only once, accepted or not
+        const prompt = this.deferredInstallPrompt;
+        this.deferredInstallPrompt = null;
+        rowPwa.style.display = 'none';
+        prompt.prompt();
+        await prompt.userChoice.catch(() => {});
       } else {
         alert('Додаток уже встановлено, або скористайтесь кнопкою встановлення в адресному рядку браузера.');
       }
@@ -410,7 +410,9 @@ export class TeacherPanel {
         <div class="panel-card backup-status-card">
           <div class="backup-status-row">
             <span class="backup-status-icon">${iconCheck()}</span>
-            <span class="privacy-text">Сховище браузера захищене від автоочищення при нестачі місця на диску.</span>
+            <span class="privacy-text" id="backup-storage-status">${StorageManager.lastSaveFailed
+              ? 'Браузер не дає зберегти дані: немає місця. Збережіть копію у файл.'
+              : 'Перевіряю сховище…'}</span>
           </div>
         </div>
       `;
@@ -423,6 +425,16 @@ export class TeacherPanel {
       width: 380,
       html: `<div id="backup-popover-content" class="backup-popover-wrap">${renderContent()}</div>`,
       onMount: (el) => {
+        const status = el.querySelector('#backup-storage-status');
+        if (status && !StorageManager.lastSaveFailed) {
+          Promise.resolve(navigator.storage?.persisted?.())
+            .catch(() => false)
+            .then((persisted) => {
+              status.textContent = persisted
+                ? 'Сховище браузера захищене від автоочищення при нестачі місця на диску.'
+                : 'Браузер може очистити дані при нестачі місця. Час від часу зберігайте копію у файл.';
+            });
+        }
         const btnExport = el.querySelector('#btn-export-backup');
         const fileImport = el.querySelector('#file-import-backup');
 
@@ -437,11 +449,13 @@ export class TeacherPanel {
           document.body.appendChild(a);
           a.click();
           document.body.removeChild(a);
-          URL.revokeObjectURL(url);
+          // Safari cancels the download if the URL is revoked right away
+          setTimeout(() => URL.revokeObjectURL(url), 10000);
         });
 
         fileImport?.addEventListener('change', (e) => {
           const file = e.target.files?.[0];
+          e.target.value = ''; // so picking the same file again fires `change`
           if (!file) return;
           const reader = new FileReader();
           reader.onload = (event) => {
@@ -464,6 +478,8 @@ export class TeacherPanel {
               if (restored) {
                 this.callbacks.onStateReload?.(restored);
                 closePopover();
+              } else {
+                alert('Не вдалося відновити копію: браузер не дав зберегти дані.');
               }
             }
           });

@@ -11,6 +11,7 @@ import {
   createClassRecord,
   renameClassRecord,
   reorderClassRecord,
+  classNames,
   nextClassColor,
   recordPrize,
   MAX_CLASS_NAME_LENGTH,
@@ -160,6 +161,7 @@ class GameApp {
         const name = rawName.trim().slice(0, MAX_CLASS_NAME_LENGTH);
         if (!name || Object.hasOwn(this.state.classes, name)) return false;
         this.state.classes[name] = createClassRecord({ color: nextClassColor(this.state.classes) });
+        this.state.classOrder = [...classNames(this.state).filter((n) => n !== name), name];
         this.switchClass(name);
         StorageManager.takeSnapshot(this.state, `Додано «${name}»`);
         return true;
@@ -167,7 +169,8 @@ class GameApp {
       onRename: (oldName, newName) => {
         const next = renameClassRecord(this.state.classes, oldName, newName);
         if (!next) return false;
-        const renamed = Object.keys(next)[Object.keys(this.state.classes).indexOf(oldName)];
+        const renamed = Object.keys(next).find((n) => !Object.hasOwn(this.state.classes, n)) || oldName;
+        this.state.classOrder = classNames(this.state).map((n) => (n === oldName ? renamed : n));
         this.state.classes = next;
         if (this.state.activeClass === oldName) this.state.activeClass = renamed;
         this.saveState();
@@ -175,9 +178,9 @@ class GameApp {
         return true;
       },
       onReorder: (className, toIndex) => {
-        const next = reorderClassRecord(this.state.classes, className, toIndex);
+        const next = reorderClassRecord(classNames(this.state), className, toIndex);
         if (!next) return;
-        this.state.classes = next;
+        this.state.classOrder = next;
         this.saveState();
       },
       onColorChange: (color) => {
@@ -199,7 +202,8 @@ class GameApp {
         if (keys.length <= 1) return;
         StorageManager.takeSnapshot(this.state, `Перед видаленням «${className}»`);
         delete this.state.classes[className];
-        this.switchClass(Object.keys(this.state.classes)[0]);
+        this.state.classOrder = classNames(this.state);
+        this.switchClass(this.state.classOrder[0]);
       },
       onGoalChange: (goal, reward) => {
         const cData = this.state.classes[this.state.activeClass];
@@ -278,6 +282,7 @@ class GameApp {
         // Mutate in-place so UI modules keep their shared `this.state` reference intact
         this.state.activeClass = nextState.activeClass;
         this.state.classes = nextState.classes;
+        this.state.classOrder = nextState.classOrder;
         Object.assign(this.state.settings, nextState.settings);
 
         const s = this.state.settings;
@@ -620,7 +625,10 @@ class GameApp {
   loop(now) {
     requestAnimationFrame(this.loop.bind(this));
 
-    const dt = Math.min(0.1, (now - this.lastFrameTime) / 1000);
+    // Physics and animation get a capped step; the task timer follows the wall clock,
+    // so a slow projector PC or a throttled background tab doesn't make it lag behind.
+    const realDt = Math.max(0, (now - this.lastFrameTime) / 1000);
+    const dt = Math.min(0.1, realDt);
     this.lastFrameTime = now;
 
     if (this.fpsEl) {
@@ -755,7 +763,7 @@ class GameApp {
     }
 
     // 6. Task Timer Update (+1 task statistic on completion!)
-    const timerRes = this.session.update(dt, currentZone);
+    const timerRes = this.session.update(realDt, currentZone);
     if (timerRes.completed) {
       if (activeClassData) {
         activeClassData.tasksCompleted = (activeClassData.tasksCompleted || 0) + 1;

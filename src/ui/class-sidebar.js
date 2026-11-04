@@ -12,7 +12,7 @@ import {
   iconMedal,
 } from './icons.js';
 import { openPopover, closePopover, getOpenPopover, escapeHtml } from './popover.js';
-import { MAX_CLASS_NAME_LENGTH, CLASS_COLORS, STAR_SPEEDS, rankClasses } from '../game/storage.js';
+import { MAX_CLASS_NAME_LENGTH, CLASS_COLORS, STAR_SPEEDS, rankClasses, classNames } from '../game/storage.js';
 
 const HISTORY_PREVIEW = 5;
 
@@ -195,7 +195,7 @@ export class ClassSidebar {
   /** Class names in display order: the teacher's order, or the leaderboard. */
   orderedNames() {
     const { classes } = this.state;
-    const names = Object.keys(classes);
+    const names = classNames(this.state);
     if (!this.sortByStars) return names;
     return names
       .map((n, i) => ({ n, i, t: classes[n].totalStars || 0 }))
@@ -382,7 +382,8 @@ export class ClassSidebar {
     this.editingClass = name;
 
     openPopover({
-      anchor: card,
+      // Edits re-render the sidebar, so look the card up again instead of holding the old node
+      anchor: () => this.findCard(this.editingClass) || card,
       side: 'right',
       title: 'Налаштування класу',
       width: 360,
