@@ -282,6 +282,18 @@ export function getThemeCardIllustration(themeId) {
         <path d="M13 25 Q20 27 27 25 Q24 31 20 31 Q16 31 13 25 Z" fill="#111827"/>
         <path d="M14.5 25.6 L16.5 28 L18.5 26 L20.5 28.2 L22.5 26 L24.5 28 L25.8 25.6 Z" fill="#FFFFFF"/>
       </svg>`;
+    case 'elements':
+      return `<svg viewBox="0 0 40 40" width="38" height="38">
+        <path d="M11 12 L15 3 L19 11 Z M29 12 L25 3 L21 11 Z" fill="#FF8A4C" stroke="#1F1A2E" stroke-width="1.6" stroke-linejoin="round"/>
+        <circle cx="20" cy="22" r="14" fill="#FF8A4C" stroke="#1F1A2E" stroke-width="1.8"/>
+        <ellipse cx="20" cy="31" rx="9" ry="6" fill="#FFF4E6"/>
+        <path d="M20 16 C15 16 16 11 19 7 C19.5 10 21 10 21.5 9 C25 12 24 16 20 16 Z" fill="#FF6B35" stroke="#1F1A2E" stroke-width="1.3" stroke-linejoin="round"/>
+        <ellipse cx="15" cy="21" rx="2" ry="2.7" fill="#1F1A2E"/>
+        <ellipse cx="25" cy="21" rx="2" ry="2.7" fill="#1F1A2E"/>
+        <circle cx="14.3" cy="20" r="0.9" fill="#FFFFFF"/>
+        <circle cx="24.3" cy="20" r="0.9" fill="#FFFFFF"/>
+        <path d="M18 26 Q19 27.3 20 26.2 Q21 27.3 22 26" stroke="#1F1A2E" stroke-width="1.3" fill="none" stroke-linecap="round"/>
+      </svg>`;
     case 'capy':
       return `<svg viewBox="0 0 40 40" width="38" height="38">
         <ellipse cx="11" cy="11" rx="3.4" ry="2.8" fill="#A8703F" stroke="#2B1B12" stroke-width="1.4"/>

@@ -60,7 +60,7 @@ src/game/zones.js        Green/yellow/red state machine with debounce + hysteres
 src/game/stars.js        StarManager: star progress per zone, golden combo, manual stars
 src/game/session.js      Lesson mode + task timer (start / toggle / cancel)
 src/game/storage.js      localStorage load/save, rolling snapshots, JSON backup import/export, pure class helpers
-src/world/, src/render/  Verlet physics, particles, canvas renderer, 12 procedural themes
+src/world/, src/render/  Verlet physics, particles, canvas renderer, 13 procedural themes (src/render/themes/)
 src/ui/hud.js            Top bar: traffic light + label, mode tabs, timer button/menu, big timer, star jar, gear
 src/ui/class-sidebar.js  Draggable physical class window: cards, leaderboard sort, medals, drag reorder, class editor
 src/ui/teacher-panel.js  Settings drawer: mic card, sensitivity, popovers (balls/scale, sound, backup, PWA install)
@@ -124,6 +124,45 @@ Backup & resilience features in `storage.js` (unit-tested in `tests/storage.test
   - `ClassSidebar` (`sidebarObstacle`): draggable floating window with interpolated substep movement, Minkowski rounded-rectangle
     corners (`border-radius: 20px`), and `computeUnpinchedEscape()` anti-crush protection when positioned close to arena walls.
   - `TeacherPanel` (`rightWallObstacle`): sliding right wall that pushes balls leftward when opening and bounds the arena while open.
+
+### Themes (`src/render/themes/`)
+
+13 themes, listed in the order of `THEMES` in `src/ui/teacher-panel.js`:
+
+| id | File | Shape | Notes |
+| --- | --- | --- | --- |
+| `craft` | `craft.js` | cube | 8×8 pixel grid, deterministic noise texture (`hash(col,row,id)`), pixel faces |
+| `blox` | `blox.js` | cube | cylinder-cube heads, stud, shirt, one accessory per avatar |
+| `brawl` | `brawl.js` | sphere | cel shadow, thick outline, shared `drawEyes` / `drawMouth` |
+| `elements` | `elements.js` | sphere | elemental creatures; `dream` (Соня) stays half-asleep in `stirring` |
+| `capy` | `capy.js` | sphere | capybaras with a head item, nose bubble when calm |
+| `sweets` | `sweets.js` | sphere | kawaii food |
+| `critters` | `critters.js` | sphere | default theme, dream clouds for every 3rd ball in golden |
+| `space`, `bubbles`, `emoji`, `plastic`, `numbers`, `eyes` | same names | sphere | `bubbles` can be popped by touch (`main.js`), `eyes` gets the pointer target |
+
+**Draw contract.** `drawX(ctx, ball)` is called with `ctx` already translated to the ball centre and scaled by squash
+(`ball.scaleX/scaleY`). The theme reads `ball.radius`, `ball.id` (pick the character with `id % LIST.length`),
+`ball.mood` (`'sleeping' | 'stirring' | 'chaos' | 'golden'`), `ball.breathePhase` and `ball.dreamPhase` (free-running
+phases for animation), `ball.angle` (roly-poly tilt — rotate by it yourself) and must leave `ctx` as it found it
+(`save()`/`restore()`). Every mood must look different at a glance from the back row.
+
+**Conventions.** Dark outline `INK` ≈ `#111827` at `max(2, r * 0.07…0.1)`. Golden mode = a pale gold ring
+(`rgba(255, 224, 102, 0.9)`) plus a small reward above the head. Keep decorations within ~1.5 r (collision uses `r`, or
+the rounded square for cubes). No `shadowBlur`, filters or per-frame image loading: up to 150 balls render at 60 FPS.
+Colors are fixed per character, so check them on both the dark arena and `light-room`.
+
+**Original designs only.** Themes may borrow a *genre* kids love (pixel sandbox, blocky obby, arena brawler,
+collectible creatures) but never copy a specific existing character, logo or name (no Pikachu, no Poké Ball, no
+Among Us crewmate). Invent the character and give it a Ukrainian name.
+
+**Adding a theme — checklist.**
+1. `src/render/themes/<id>.js` exporting `draw<Name>(ctx, ball)`.
+2. `src/render/renderer.js`: import, `case '<id>'` in the switch, add to `ZZZ_THEMES` if characters sleep.
+3. Cube-shaped? add the id to `isBoxTheme` in `src/world/physics.js`.
+4. `src/ui/teacher-panel.js` `THEMES` (title + short subtitle) and a 40×40 SVG in `getThemeCardIllustration` (`src/ui/icons.js`).
+5. `tests/icons.test.js` theme list; README theme table; «Теми кульок» table in `docs/TEACHER_GUIDE.md`.
+6. Look at every character in all four moods (a scratch page that calls the draw function in a grid is the quickest way),
+   then in the app with `?debug`.
 
 ## Verifying changes
 
