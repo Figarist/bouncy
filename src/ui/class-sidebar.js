@@ -50,14 +50,138 @@ export class ClassSidebar {
     this.isAdding = false;
     this.editingClass = null;
     this.drag = null;
+    this.velocity = { vx: 0, vy: 0 };
+    this.lastMoveTime = 0;
+    this.isMovingWindow = false;
 
     this.el = document.createElement('aside');
     this.el.className = 'class-sidebar liquid-glass-surface';
     document.body.appendChild(this.el);
 
     this.el.addEventListener('click', (e) => this.onClick(e));
-    this.el.addEventListener('pointerdown', (e) => this.onDragStart(e));
+    this.el.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('.class-card-grip')) {
+        this.onDragStart(e);
+      } else {
+        this.onWindowDragStart(e);
+      }
+    });
     this.render();
+    this.applySavedPosition();
+  }
+
+  applySavedPosition() {
+    const pos = this.state.settings.sidebarPos;
+    if (pos && typeof pos.x === 'number' && typeof pos.y === 'number') {
+      const currentW = this.el.offsetWidth || 240;
+      const currentH = this.el.offsetHeight || 180;
+      const maxLeft = Math.max(8, window.innerWidth - currentW - 8);
+      const maxTop = Math.max(8, window.innerHeight - currentH - 8);
+      const safeX = Math.max(8, Math.min(maxLeft, pos.x));
+      const safeY = Math.max(8, Math.min(maxTop, pos.y));
+      this.el.style.left = `${safeX}px`;
+      this.el.style.top = `${safeY}px`;
+      this.el.style.right = 'auto';
+      this.el.style.bottom = 'auto';
+    } else {
+      this.el.style.left = '';
+      this.el.style.top = '';
+      this.el.style.right = '';
+      this.el.style.bottom = '';
+    }
+  }
+
+  getPhysicalRect() {
+    const rect = this.el.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return null;
+
+    // Zero out velocity if the pointer hasn't moved in the last 45ms so held windows never impart stale velocity
+    const now = performance.now();
+    if (!this.isMovingWindow || now - this.lastMoveTime > 45) {
+      this.velocity.vx = 0;
+      this.velocity.vy = 0;
+    }
+
+    return {
+      left: rect.left,
+      top: rect.top,
+      right: rect.right,
+      bottom: rect.bottom,
+      vx: this.velocity.vx,
+      vy: this.velocity.vy,
+      isMoving: Boolean(this.isMovingWindow),
+    };
+  }
+
+  onWindowDragStart(e) {
+    if (e.target.closest('button, input, .class-card, a, .class-card-grip, .sidebar-add-form')) return;
+
+    const rect = this.el.getBoundingClientRect();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const initialLeft = rect.left;
+    const initialTop = rect.top;
+
+    let lastX = initialLeft;
+    let lastY = initialTop;
+    let lastTime = performance.now();
+    this.velocity = { vx: 0, vy: 0 };
+    this.lastMoveTime = lastTime;
+    this.isMovingWindow = true;
+    this.el.classList.add('window-dragging');
+
+    const onMove = (ev) => {
+      if (ev.pointerId !== e.pointerId) return;
+      const now = performance.now();
+      const dt = Math.max(0.008, (now - lastTime) / 1000);
+
+      const deltaX = ev.clientX - startX;
+      const deltaY = ev.clientY - startY;
+
+      const currentW = this.el.offsetWidth || rect.width;
+      const currentH = this.el.offsetHeight || rect.height;
+      const maxLeft = Math.max(8, window.innerWidth - currentW - 8);
+      const maxTop = Math.max(8, window.innerHeight - currentH - 8);
+      const newLeft = Math.max(8, Math.min(maxLeft, initialLeft + deltaX));
+      const newTop = Math.max(8, Math.min(maxTop, initialTop + deltaY));
+
+      this.velocity = {
+        vx: (newLeft - lastX) / dt,
+        vy: (newTop - lastY) / dt,
+      };
+
+      lastX = newLeft;
+      lastY = newTop;
+      lastTime = now;
+      this.lastMoveTime = now;
+
+      this.el.style.left = `${newLeft}px`;
+      this.el.style.top = `${newTop}px`;
+      this.el.style.right = 'auto';
+      this.el.style.bottom = 'auto';
+    };
+
+    const onUp = (ev) => {
+      if (ev.pointerId !== e.pointerId) return;
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+
+      this.isMovingWindow = false;
+      this.el.classList.remove('window-dragging');
+
+      const currentRect = this.el.getBoundingClientRect();
+      this.state.settings.sidebarPos = {
+        x: Math.round(currentRect.left),
+        y: Math.round(currentRect.top),
+      };
+      this.callbacks.onSaveState?.();
+      this.velocity = { vx: 0, vy: 0 };
+    };
+
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
   }
 
   get collapsed() {
@@ -178,6 +302,7 @@ export class ClassSidebar {
         closePopover();
         this.callbacks.onCollapseChange(!this.collapsed);
         this.render();
+        this.applySavedPosition();
         break;
       case 'sort':
         closePopover();
@@ -188,6 +313,7 @@ export class ClassSidebar {
         if (this.collapsed) this.callbacks.onCollapseChange(false);
         this.isAdding = true;
         this.render();
+        this.applySavedPosition();
         break;
       case 'select':
         if (name && name !== this.state.activeClass) this.callbacks.onSelect(name);

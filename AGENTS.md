@@ -14,7 +14,7 @@ Every UI decision should pass the test "a teacher understands it in one second, 
   ("Запам'ятати тишу", not "Калібрування DSP"). Keep technical terms (dB, HPF, RMS) out of the main UI.
 - **No runtime dependencies.** Vanilla JS modules + Vite. Fonts come from `@fontsource`. Don't add frameworks.
 - **No system emoji in the UI.** Icons are inline SVG from `src/ui/icons.js` (emoji in docs are fine).
-- **Escape anything the teacher typed** (class names, prizes, device labels) with `escapeHtml` from `src/ui/popover.js`
+- **Escape anything the teacher typed** (class names, prizes, device labels, snapshot labels) with `escapeHtml` from `src/ui/popover.js`
   before putting it into `innerHTML`. Remember that `el.dataset.x` returns the *unescaped* value.
 - **Privacy:** audio never leaves the browser; nothing is sent anywhere. Don't add analytics or network calls.
 - **Size for TV:** HUD and the class sidebar scale with `vmin`/`clamp()`. Settings panel and popovers use `px` (teacher-only, close range).
@@ -25,6 +25,8 @@ Every UI decision should pass the test "a teacher understands it in one second, 
 ```bash
 npm install
 npm run dev          # http://localhost:5173 — add ?debug for a noise simulator bar (no mic needed)
+npm run dev:test     # Vite dev server opening /?debug automatically
+npm run serve:test   # Zero-dependency Node static server serving dist/ with ?debug
 npm test             # Vitest, all pure logic
 npm run build        # -> dist/
 npm run deploy:site  # build + rsync dist/ into ../figarist.github.io/bouncy/ (then commit & push that repo)
@@ -43,11 +45,11 @@ src/audio/               mic.js (Web Audio DSP chain + calibration), meter.js (d
 src/game/zones.js        Green/yellow/red state machine with debounce + hysteresis
 src/game/stars.js        StarManager: star progress per zone, golden combo, manual stars
 src/game/session.js      Lesson mode + task timer (start / toggle / cancel)
-src/game/storage.js      localStorage load/save + pure class helpers (see below)
+src/game/storage.js      localStorage load/save, rolling snapshots, JSON backup import/export, pure class helpers
 src/world/, src/render/  Verlet physics, particles, canvas renderer, 10 procedural themes
 src/ui/hud.js            Top bar: traffic light + label, mode tabs, timer button/menu, big timer, star jar, gear
-src/ui/class-sidebar.js  Left class list: cards, leaderboard sort, medals, drag reorder, class editor popover
-src/ui/teacher-panel.js  Settings drawer: mic card, sensitivity, rows that open popovers
+src/ui/class-sidebar.js  Draggable physical class window: cards, leaderboard sort, medals, drag reorder, class editor
+src/ui/teacher-panel.js  Settings drawer: mic card, sensitivity, popovers (balls/scale, sound, backup, PWA install)
 src/ui/popover.js        openPopover / closePopover / getOpenPopover / escapeHtml — one popover at a time
 src/ui/icons.js          All SVG icons and theme preview illustrations
 src/styles/main.css      Tokens, Liquid Glass surfaces, HUD, sidebar, panel, popovers
@@ -66,37 +68,51 @@ src/styles/main.css      Tokens, Liquid Glass surfaces, HUD, sidebar, panel, pop
       prizeHistory: [{ reward, date /* ISO */ }],   // newest first, capped at 30
     },
   },
-  settings: { mode, theme, sensitivity, balls, alertSound, alertRepeatSec, volume, lightRoom,
-              ambientBaselineDb, micDeviceId, micProfile, micGain, sidebarCollapsed, sidebarSort },
+  settings: {
+    mode, theme, sensitivity, balls,
+    ballScale,                     // 0.2 .. 2.0 (step 0.1), default 1.0
+    sidebarPos,                    // { x, y } in px or null for default CSS placement
+    alertSound, alertRepeatSec, volume, lightRoom,
+    ambientBaselineDb, micDeviceId, micProfile, micGain,
+    sidebarCollapsed, sidebarSort,
+  },
 }
 ```
 
-`StorageManager.load()` normalizes old saves (fills `color`, `secondsPerStar`, `prizeHistory`), so new fields
-must get a default there **and** in `createClassRecord`. The class name is the key, so renaming and reordering
+`StorageManager.load()` and `StorageManager.importBackup()` normalize old saves and imported files via `normalizeSettings()`
+(clamping `ballScale` to `0.2..2.0`, `balls` to `10..150`, and rounding `sidebarPos`), so new fields must get a default
+in `DEFAULT_STATE`, `normalizeSettings`, and `createClassRecord`. The class name is the key, so renaming and reordering
 rebuild the object — use `renameClassRecord` / `reorderClassRecord`, never mutate keys in place.
-`main.js` replaces `state.classes` on rename/reorder; UI modules keep a reference to `state`, not to `state.classes`.
+`main.js` mutates `this.state` in-place on `onStateReload` so UI modules keep their shared `state` reference intact.
 
-Pure helpers in `storage.js` (all unit-tested in `tests/storage.test.js`):
-`createClassRecord`, `renameClassRecord`, `reorderClassRecord`, `rankClasses` (top-3 by `totalStars`, ties share a place),
-`recordPrize`, `nextClassColor`, plus `CLASS_COLORS`, `STAR_SPEEDS`, `MAX_CLASS_NAME_LENGTH`.
+Backup & resilience features in `storage.js` (unit-tested in `tests/storage.test.js`):
+- **Rolling snapshots (`localStorage['tyhyi-klas:snapshots']`)**: up to `MAX_SNAPSHOTS` (5) automatic restore points
+  created via `StorageManager.takeSnapshot(state, label)` on class creation, deletion, star reset, goal completion,
+  and before restoring or importing backups.
+- **JSON file export/import**: `StorageManager.exportBackup(state)` and `StorageManager.importBackup(jsonString)`
+  allow teachers to save and restore `.json` backups on a USB drive.
+- **Persistent storage**: `StorageManager.requestPersistentStorage()` requests `navigator.storage.persist()` on startup.
 
-### Data flow
+### Physics & Dynamic Obstacles (`src/world/physics.js`, `src/world/ball.js`)
 
-- The loop in `main.js` samples the mic → `evaluateLevel` → `ZoneStateMachine` → physics/alerts → `StarManager`
-  → timer → render → HUD. A star or a finished timer updates the active class record, calls `saveState()`
-  and `sidebar.update()`.
-- UI modules never touch storage. They get `state` (read-only by convention) and call back into `main.js`
-  (`getSidebarCallbacks()`, `getPanelCallbacks()`, the HUD callbacks object), which mutates state and saves.
-- `sidebar.update()` re-renders the cards (skipped while the teacher types a new class or drags a card) and
-  refreshes numbers in an open class editor without rebuilding it, so inputs keep focus.
-- Popovers live on `document.body` (z-index 200). The class sidebar sits *below* the HUD layer (z 9 < 10)
-  so alert banners and the goal modal cover it; the HUD container is `pointer-events: none`, so cards stay clickable.
-- `TeacherPanel.$(selector)` searches the panel and the popover it opened (mic gain/meter live in a popover).
+- **Fixed 60 Hz Verlet integration** with 3 substeps per frame and a spatial hash grid (`cellSize` adapts dynamically to ball radius).
+- **Scale & stack stability**: `setBallScale(scale)` clamps scale to `0.2x..2.0x` and preserves damped Verlet velocities `(x - px, y - py)`
+  when clamping positions so scale changes never inject phantom kinetic energy. `resolveBallCollisions()` sorts balls bottom-up (`_rank`),
+  shifts both current `(x, y)` and previous `(px, py)` positions during overlap separation, applies floor-support mass weighting,
+  and sandwiches ball-to-ball collisions between pre- and post-boundary passes so dense piles settle without infinite bounce.
+- **Sub-stepped squash & roly-poly springs (`src/world/ball.js`)**: `updateAnimation()` integrates squash-and-stretch (`[0.72, 1.28]`)
+  and upright roly-poly tilt (`±0.45 rad`) with 120 Hz sub-stepped semi-implicit Euler so frame drops up to `0.1 s` never cause spring resonance.
+- **Shape-aware spheres & cubes**: `getBallExtent(b)` uses exact circle radius for spherical themes and a rotated rounded-square
+  Minkowski support function for blocky themes (`craft`, `blox`), plus flat-face alignment torque on horizontal surfaces.
+- **Interactive UI obstacles**:
+  - `ClassSidebar` (`sidebarObstacle`): draggable floating window with interpolated substep movement, Minkowski rounded-rectangle
+    corners (`border-radius: 20px`), and `computeUnpinchedEscape()` anti-crush protection when positioned close to arena walls.
+  - `TeacherPanel` (`rightWallObstacle`): sliding right wall that pushes balls leftward when opening and bounds the arena while open.
 
 ## Verifying changes
 
-- `npm test` must pass. Put new pure logic in `src/game/*` with a test next to the existing ones.
+- `npm test` must pass. Put new pure logic in `src/game/*` or `src/world/*` with a test in `tests/`.
 - Check the UI in a browser with `?debug` (the built-in browser can't grant mic access; the debug bar's
-  «Тиша / Шепіт / Крик!» buttons simulate levels). Check: dark and light room, sidebar expanded/collapsed/leaderboard,
-  class editor, settings popovers, timer + big timer, and a ~375 px wide viewport.
+  «Тиша / Шепіт / Крик!» buttons simulate levels). Check: dark and light room, sidebar dragging/expanded/collapsed/leaderboard,
+  ball scale `0.2x..2.0x` across sphere and cube themes, class editor, settings popovers, backup export/import, and timer.
 - Clear `localStorage['tyhyi-klas:v1']` after testing with fake classes.

@@ -60,16 +60,43 @@ export class Ball {
     this.py -= iy;
   }
 
-  triggerSquash(normalX, normalY, intensity) {
-    const factor = Math.min(0.45, Math.abs(intensity) * 0.04);
-    // Squash in direction of normal, stretch orthogonally
-    this.scaleX = 1.0 + Math.abs(normalY) * factor - Math.abs(normalX) * factor;
-    this.scaleY = 1.0 + Math.abs(normalX) * factor - Math.abs(normalY) * factor;
+  resetSquash() {
+    this.scaleX = 1.0;
+    this.scaleY = 1.0;
+    this.squashVelocityX = 0;
+    this.squashVelocityY = 0;
   }
 
-  updateAnimation(dt, zone, isGolden) {
-    this.breathePhase += dt * 2.0;
-    this.dreamPhase += dt * 1.6;
+  triggerSquash(normalX, normalY, intensity) {
+    const cleanIntensity = Math.abs(intensity) - 1.1;
+    if (cleanIntensity <= 0) return;
+
+    const factor = Math.min(0.28, cleanIntensity * 0.026);
+    const len = Math.hypot(normalX, normalY) || 1;
+    const nx = Math.abs(normalX / len);
+    const ny = Math.abs(normalY / len);
+
+    // Squash in direction of normal, stretch orthogonally
+    const targetScaleX = Math.max(0.72, Math.min(1.28, 1.0 + (ny - nx) * factor));
+    const targetScaleY = Math.max(0.72, Math.min(1.28, 1.0 + (nx - ny) * factor));
+
+    // Only override if the new deformation is stronger than the current one
+    if (
+      Math.abs(targetScaleX - 1.0) >= Math.abs(this.scaleX - 1.0) ||
+      Math.abs(targetScaleY - 1.0) >= Math.abs(this.scaleY - 1.0)
+    ) {
+      this.scaleX = targetScaleX;
+      this.scaleY = targetScaleY;
+      // Dampen existing spring velocity so repeated substep hits never accumulate energy
+      this.squashVelocityX *= 0.2;
+      this.squashVelocityY *= 0.2;
+    }
+  }
+
+  updateAnimation(dt, zone, isGolden, isBox = false) {
+    const safeDt = Math.min(0.05, Math.max(0, dt));
+    this.breathePhase += safeDt * 2.0;
+    this.dreamPhase += safeDt * 1.6;
 
     // Update mood based on zone
     if (zone === 'red') {
@@ -83,31 +110,58 @@ export class Ball {
     }
 
     // Blinking
-    this.blinkTimer -= dt;
+    this.blinkTimer -= safeDt;
     if (this.blinkTimer <= 0) {
       this.isBlinking = !this.isBlinking;
       this.blinkTimer = this.isBlinking ? 0.15 : Math.random() * 4 + 2.5;
     }
 
-    // Squash recovery spring
-    const spring = 180;
-    const damping = 12;
+    // Sub-stepped semi-implicit Euler for unconditionally stable spring recovery
+    const steps = Math.max(1, Math.ceil(safeDt * 120));
+    const subDt = safeDt / steps;
 
-    const ax = -spring * (this.scaleX - 1.0) - damping * this.squashVelocityX;
-    this.squashVelocityX += ax * dt;
-    this.scaleX += this.squashVelocityX * dt;
+    const spring = 150;
+    const damping = 19;
+    const rolySpring = isBox ? 64 : 42;
+    const rolyDamping = isBox ? 13 : 8.5;
 
-    const ay = -spring * (this.scaleY - 1.0) - damping * this.squashVelocityY;
-    this.squashVelocityY += ay * dt;
-    this.scaleY += this.squashVelocityY * dt;
+    this.angularVelocity = Math.max(-10, Math.min(10, this.angularVelocity));
 
-    // Roly-Poly upright spring: angle seeks 0 with gentle damping (±25° max tilt)
-    const rolySpring = 42;
-    const rolyDamping = 8;
-    const torque = -rolySpring * this.angle - rolyDamping * this.angularVelocity;
-    this.angularVelocity += torque * dt;
-    this.angle += this.angularVelocity * dt;
-    // Clamp angle to ±25 degrees (~0.44 rad) so characters never turn upside down
-    this.angle = Math.max(-0.45, Math.min(0.45, this.angle));
+    for (let i = 0; i < steps; i++) {
+      const ax = -spring * (this.scaleX - 1.0) - damping * this.squashVelocityX;
+      this.squashVelocityX = Math.max(-8, Math.min(8, this.squashVelocityX + ax * subDt));
+      this.scaleX = Math.max(0.72, Math.min(1.28, this.scaleX + this.squashVelocityX * subDt));
+
+      const ay = -spring * (this.scaleY - 1.0) - damping * this.squashVelocityY;
+      this.squashVelocityY = Math.max(-8, Math.min(8, this.squashVelocityY + ay * subDt));
+      this.scaleY = Math.max(0.72, Math.min(1.28, this.scaleY + this.squashVelocityY * subDt));
+
+      // Roly-Poly upright spring: angle seeks 0 with gentle damping (±25° max tilt)
+      const torque = -rolySpring * this.angle - rolyDamping * this.angularVelocity;
+      this.angularVelocity = Math.max(-10, Math.min(10, this.angularVelocity + torque * subDt));
+      this.angle += this.angularVelocity * subDt;
+
+      if (this.angle > 0.45) {
+        this.angle = 0.45;
+        if (this.angularVelocity > 0) this.angularVelocity = 0;
+      } else if (this.angle < -0.45) {
+        this.angle = -0.45;
+        if (this.angularVelocity < 0) this.angularVelocity = 0;
+      }
+    }
+
+    // Snap to rest when settled to avoid micro-oscillations
+    if (Math.abs(this.scaleX - 1.0) < 0.0015 && Math.abs(this.squashVelocityX) < 0.01) {
+      this.scaleX = 1.0;
+      this.squashVelocityX = 0;
+    }
+    if (Math.abs(this.scaleY - 1.0) < 0.0015 && Math.abs(this.squashVelocityY) < 0.01) {
+      this.scaleY = 1.0;
+      this.squashVelocityY = 0;
+    }
+    if (Math.abs(this.angle) < 0.001 && Math.abs(this.angularVelocity) < 0.01) {
+      this.angle = 0;
+      this.angularVelocity = 0;
+    }
   }
 }

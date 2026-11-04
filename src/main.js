@@ -82,7 +82,18 @@ class GameApp {
 
     // Initial setup
     this.renderer.setTheme(this.state.settings.theme);
+    this.physics.setTheme(this.state.settings.theme);
+    this.physics.setBallScale(this.state.settings.ballScale ?? 1.0);
     this.applyLightRoom(this.state.settings.lightRoom);
+
+    // Request persistent storage protection
+    StorageManager.requestPersistentStorage();
+
+    // Listen for PWA installation prompt
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      this.panel.setDeferredInstallPrompt(e);
+    });
 
     // State
     this.lastFrameTime = performance.now();
@@ -150,6 +161,7 @@ class GameApp {
         if (!name || Object.hasOwn(this.state.classes, name)) return false;
         this.state.classes[name] = createClassRecord({ color: nextClassColor(this.state.classes) });
         this.switchClass(name);
+        StorageManager.takeSnapshot(this.state, `Додано «${name}»`);
         return true;
       },
       onRename: (oldName, newName) => {
@@ -185,6 +197,7 @@ class GameApp {
       onDelete: (className) => {
         const keys = Object.keys(this.state.classes);
         if (keys.length <= 1) return;
+        StorageManager.takeSnapshot(this.state, `Перед видаленням «${className}»`);
         delete this.state.classes[className];
         this.switchClass(Object.keys(this.state.classes)[0]);
       },
@@ -214,6 +227,9 @@ class GameApp {
       },
       onSortChange: (sort) => {
         this.state.settings.sidebarSort = sort;
+        this.saveState();
+      },
+      onSaveState: () => {
         this.saveState();
       },
     };
@@ -253,9 +269,47 @@ class GameApp {
         this.physics.setBallCount(val);
         this.saveState();
       },
+      onBallScale: (scale) => {
+        this.state.settings.ballScale = scale;
+        this.physics.setBallScale(scale);
+        this.saveState();
+      },
+      onStateReload: (nextState) => {
+        // Mutate in-place so UI modules keep their shared `this.state` reference intact
+        this.state.activeClass = nextState.activeClass;
+        this.state.classes = nextState.classes;
+        Object.assign(this.state.settings, nextState.settings);
+
+        const s = this.state.settings;
+        const modeCfg = this.session.setMode(s.mode);
+        this.hud.updateMode(modeCfg.id);
+
+        this.renderer.setTheme(s.theme);
+        this.physics.setTheme(s.theme);
+        this.physics.setBallScale(s.ballScale ?? 1.0);
+        this.physics.setBallCount(s.balls);
+
+        this.applyLightRoom(s.lightRoom);
+        sfx.setVolume(s.volume);
+
+        this.mic.ambientBaselineDb = s.ambientBaselineDb || -55;
+        this.mic.deviceId = s.micDeviceId || '';
+        this.mic.setProfile(s.micProfile || 'webcam');
+        this.mic.setGain(s.micGain || 2.2);
+
+        this.switchClass(this.state.activeClass);
+        this.sidebar.render();
+        this.sidebar.applySavedPosition();
+
+        this.panel.render();
+        this.panel.bindEvents();
+        this.panel.setMicButtonState(this.mic.isListening);
+        this.saveState();
+      },
       onTheme: (theme) => {
         this.state.settings.theme = theme;
         this.renderer.setTheme(theme);
+        this.physics.setTheme(theme);
         this.saveState();
       },
       onSound: (sound, preview = false) => {
@@ -337,6 +391,9 @@ class GameApp {
 
   resetCurrentStars() {
     const cData = this.state.classes[this.state.activeClass];
+    if (cData && cData.stars > 0) {
+      StorageManager.takeSnapshot(this.state, `Перед скиданням банки «${this.state.activeClass}»`);
+    }
     if (cData) {
       cData.stars = 0;
     }
@@ -356,6 +413,7 @@ class GameApp {
         cData.goalsReached = (cData.goalsReached || 0) + 1;
         recordPrize(cData, cData.reward);
         this.saveState();
+        StorageManager.takeSnapshot(this.state, `Ціль досягнуто: «${this.state.activeClass}»`);
         this.sidebar.update();
       }
       sfx.playFanfare();
@@ -370,6 +428,7 @@ class GameApp {
     const w = window.innerWidth;
     const h = window.innerHeight;
     this.renderer.resize(w, h);
+    this.sidebar?.applySavedPosition();
     this.physics.resize(w, h);
     this.physics.setBallCount(this.state.settings.balls);
   }
@@ -667,7 +726,6 @@ class GameApp {
         sfx.playAlert(this.state.settings.alertSound);
 
         if (shouldPlayRepeat) {
-          // Give an extra strong bounce & shake on each repeat alert so kids notice!
           this.physics.scareBounce(1.55);
           this.hud.triggerScreenShake();
         }
@@ -713,6 +771,13 @@ class GameApp {
         this.awardStarWithFlight();
       }
     }
+
+    // 6.5 Dynamic UI Obstacles (Sidebar and sliding Settings Panel)
+    const sidebarObstacle = this.sidebar.getPhysicalRect();
+    this.physics.setSidebarObstacle(sidebarObstacle);
+
+    const rightWallObstacle = this.panel.getPhysicalWall();
+    this.physics.setRightWallObstacle(rightWallObstacle);
 
     // 7. Physics Simulation Step
     this.physics.update(dt, currentZone, starRes.isGolden);

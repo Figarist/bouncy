@@ -1235,7 +1235,15 @@ body.light-room .ring-bg {
   flex-direction: column;
   gap: 8px;
   pointer-events: auto;
+  cursor: grab;
+  user-select: none;
   transition: width 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.class-sidebar.window-dragging {
+  cursor: grabbing;
+  transition: none !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.48), 0 0 0 2px rgba(59, 130, 246, 0.6);
 }
 
 .sidebar-head {
@@ -1243,6 +1251,7 @@ body.light-room .ring-bg {
   align-items: center;
   gap: 4px;
   padding: 0 2px 0 6px;
+  cursor: grab;
 }
 
 .sidebar-title {
@@ -1279,8 +1288,38 @@ body.light-room .ring-bg {
   flex-direction: column;
   gap: 6px;
   overflow-y: auto;
+  overflow-x: hidden;
   scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.32) transparent;
+  padding-right: 6px;
   min-height: 0;
+}
+
+.sidebar-list::-webkit-scrollbar {
+  width: 6px;
+}
+.sidebar-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sidebar-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: background 0.15s;
+}
+.sidebar-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.52);
+}
+
+body.light-room .sidebar-list {
+  scrollbar-color: rgba(15, 23, 42, 0.28) transparent;
+}
+body.light-room .sidebar-list::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 42, 0.28);
+  border-color: rgba(15, 23, 42, 0.08);
+}
+body.light-room .sidebar-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(15, 23, 42, 0.48);
 }
 
 .class-card {
@@ -2163,4 +2202,69 @@ body.light-room .big-timer-digits {
 @keyframes timerPulse {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.06); }
+}
+
+/* Backup & Snapshots Popover */
+.backup-popover-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.backup-upload-label {
+  cursor: pointer;
+}
+.snapshots-list {
+  max-height: 210px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  scrollbar-width: thin;
+}
+.snapshot-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 10px;
+  background: var(--btn-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+}
+.snapshot-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.snapshot-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.snapshot-meta {
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.btn-restore-snap {
+  padding: 5px 9px;
+  font-size: 12px;
+  flex: 0 0 auto;
+}
+.backup-status-card {
+  padding: 9px 11px;
+}
+.backup-status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.backup-status-icon {
+  color: var(--zone-green);
+  display: inline-flex;
+  flex-shrink: 0;
 }
