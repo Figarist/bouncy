@@ -89,11 +89,11 @@ export class CanvasRenderer {
       ctx.fillStyle = 'rgba(148, 163, 184, 0.08)';
       ctx.fillRect(0, h - 40, w, 40);
     } else {
-      // Classroom focus night theme (deep indigo to twilight violet)
+      // Friendly Arcade "Deep Midnight" night theme
       const grad = ctx.createLinearGradient(0, 0, 0, h);
-      grad.addColorStop(0, '#0F122B');
-      grad.addColorStop(0.7, '#191538');
-      grad.addColorStop(1, '#25133E');
+      grad.addColorStop(0, '#1A1A2E');
+      grad.addColorStop(0.7, '#18203F');
+      grad.addColorStop(1, '#16213E');
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, w, h);
 
