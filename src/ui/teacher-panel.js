@@ -14,9 +14,15 @@ import {
   iconSun,
   iconHelp,
   iconSliders,
+  iconDatabase,
+  iconDownload,
+  iconUpload,
+  iconCheck,
+  iconReset,
   getThemeCardIllustration,
 } from './icons.js';
-import { openPopover, getOpenPopover, escapeHtml } from './popover.js';
+import { openPopover, getOpenPopover, closePopover, escapeHtml } from './popover.js';
+import { StorageManager } from '../game/storage.js';
 
 const THEMES = [
   { id: 'craft', title: 'Крафт-Куби', sub: 'Піксель-світ' },
@@ -76,6 +82,10 @@ export class TeacherPanel {
     this.isListening = false;
     this.isCalibrating = false;
     this.devices = [];
+    this.deferredInstallPrompt = null;
+    this.lastWallX = typeof window !== 'undefined' ? window.innerWidth : 1200;
+    this.lastWallTime = performance.now();
+    this.wallVx = 0;
 
     this.panel = document.createElement('div');
     this.panel.className = 'teacher-panel closed';
@@ -182,6 +192,24 @@ export class TeacherPanel {
             </span>
             ${iconChevron('right')}
           </button>
+
+          <button class="list-row" id="row-backup">
+            <span class="list-row-icon">${iconDatabase()}</span>
+            <span class="list-row-text">
+              <span class="list-row-title">Резервні копії та дані</span>
+              <span class="list-row-value">Збереження, авто-зліпки, імпорт</span>
+            </span>
+            ${iconChevron('right')}
+          </button>
+
+          <button class="list-row" id="row-pwa-install" style="display: ${this.deferredInstallPrompt ? 'flex' : 'none'};">
+            <span class="list-row-icon">${iconDownload()}</span>
+            <span class="list-row-text">
+              <span class="list-row-title">Встановити додаток на ПК</span>
+              <span class="list-row-value">Ярлик на робочому столі</span>
+            </span>
+            ${iconChevron('right')}
+          </button>
         </section>
 
         <div class="panel-footer">
@@ -192,9 +220,43 @@ export class TeacherPanel {
     `;
   }
 
+  formatBallScale(scale) {
+    const s = Math.round(Number(scale) * 10) / 10 || 1.0;
+    if (s === 1.0) return '1× (стандарт)';
+    return `${s}×`;
+  }
+
+  setDeferredInstallPrompt(e) {
+    this.deferredInstallPrompt = e;
+    const row = this.panel.querySelector('#row-pwa-install');
+    if (row) row.style.display = 'flex';
+  }
+
+  getPhysicalWall() {
+    const rect = this.panel.getBoundingClientRect();
+    const currentX = rect.left;
+    const now = performance.now();
+    const dt = Math.max(0.008, (now - this.lastWallTime) / 1000);
+
+    this.wallVx = (currentX - this.lastWallX) / dt;
+    this.lastWallX = currentX;
+    this.lastWallTime = now;
+
+    if (currentX < window.innerWidth - 2) {
+      return {
+        x: currentX,
+        vx: this.wallVx,
+        isOpen: !this.panel.classList.contains('closed'),
+      };
+    }
+    return null;
+  }
+
   themeSummary() {
     const th = THEMES.find((x) => x.id === this.state.settings.theme) || THEMES[0];
-    return `${th.title} · ${this.state.settings.balls} шт.`;
+    const s = this.state.settings;
+    const scaleStr = s.ballScale && s.ballScale !== 1.0 ? ` · ${s.ballScale}×` : '';
+    return `${th.title} · ${s.balls} шт.${scaleStr}`;
   }
 
   soundSummary() {
@@ -222,6 +284,21 @@ export class TeacherPanel {
     this.panel.querySelector('#row-theme').addEventListener('click', (e) => this.openThemePopover(e.currentTarget));
     this.panel.querySelector('#row-sound').addEventListener('click', (e) => this.openSoundPopover(e.currentTarget));
     this.panel.querySelector('#row-help').addEventListener('click', (e) => this.openHelpPopover(e.currentTarget));
+    this.panel.querySelector('#row-backup').addEventListener('click', (e) => this.openBackupPopover(e.currentTarget));
+
+    const rowPwa = this.panel.querySelector('#row-pwa-install');
+    rowPwa?.addEventListener('click', async () => {
+      if (this.deferredInstallPrompt) {
+        this.deferredInstallPrompt.prompt();
+        const choice = await this.deferredInstallPrompt.userChoice;
+        if (choice.outcome === 'accepted') {
+          this.deferredInstallPrompt = null;
+          rowPwa.style.display = 'none';
+        }
+      } else {
+        alert('Додаток уже встановлено, або скористайтесь кнопкою встановлення в адресному рядку браузера.');
+      }
+    });
 
     this.panel.querySelector('#check-light-room').addEventListener('change', (e) => {
       this.callbacks.onLightRoom(e.target.checked);
@@ -257,6 +334,17 @@ export class TeacherPanel {
           <span class="slider-val" id="val-balls">${s.balls}</span>
         </div>
         <input type="range" class="slider" id="slider-balls" min="10" max="150" step="5" value="${s.balls}">
+
+        <div class="slider-header">
+          <span class="field-label">Розмір кульок</span>
+          <span class="slider-val" id="val-ball-scale">${this.formatBallScale(s.ballScale ?? 1.0)}</span>
+        </div>
+        <input type="range" class="slider" id="slider-ball-scale" min="0.2" max="2.0" step="0.1" value="${Math.min(2.0, s.ballScale ?? 1.0)}">
+        <div class="slider-hints">
+          <span>0.2× (дрібні)</span>
+          <span>1× (стандарт)</span>
+          <span>2× (великі)</span>
+        </div>
       `,
       onMount: (el) => {
         el.querySelectorAll('.theme-card').forEach((card) => {
@@ -273,6 +361,112 @@ export class TeacherPanel {
           vBalls.textContent = val;
           this.callbacks.onBalls(val);
           this.refreshSummaries();
+        });
+
+        const sScale = el.querySelector('#slider-ball-scale');
+        const vScale = el.querySelector('#val-ball-scale');
+        sScale?.addEventListener('input', () => {
+          const val = Math.max(0.2, Math.min(2.0, Math.round(parseFloat(sScale.value) * 10) / 10));
+          vScale.textContent = this.formatBallScale(val);
+          this.callbacks.onBallScale(val);
+          this.refreshSummaries();
+        });
+      },
+    });
+  }
+
+  openBackupPopover(anchor) {
+    const renderContent = () => {
+      const snapshots = StorageManager.getSnapshots();
+      return `
+        <span class="field-label">Резервна копія на диск</span>
+        <div class="btn-row">
+          <button class="action-btn" id="btn-export-backup" title="Завантажити файл збережень на флешку">
+            ${iconDownload()} <span>Зберегти файл (.json)</span>
+          </button>
+          <label class="action-btn secondary backup-upload-label" id="lbl-import-backup" title="Завантажити збереження з файлу">
+            ${iconUpload()} <span>Відновити з файлу</span>
+            <input type="file" id="file-import-backup" accept=".json" class="hidden">
+          </label>
+        </div>
+
+        <span class="field-label">Автоматичні копії (останні 5)</span>
+        <div class="snapshots-list">
+          ${snapshots.length === 0
+            ? '<p class="privacy-text">Ще немає копій. Вони створюються автоматично при зміні класів.</p>'
+            : snapshots.map((s) => `
+              <div class="snapshot-item">
+                <div class="snapshot-info">
+                  <span class="snapshot-title">${escapeHtml(s.label || 'Авто-збереження')}</span>
+                  <span class="snapshot-meta">${new Date(s.timestamp).toLocaleString('uk-UA')} · ${s.classesCount} кл. · ★ ${s.totalStars}</span>
+                </div>
+                <button class="action-btn secondary btn-restore-snap" data-snap-id="${escapeHtml(s.id)}">
+                  ${iconReset()} Відновити
+                </button>
+              </div>
+            `).join('')}
+        </div>
+
+        <div class="panel-card backup-status-card">
+          <div class="backup-status-row">
+            <span class="backup-status-icon">${iconCheck()}</span>
+            <span class="privacy-text">Сховище браузера захищене від автоочищення при нестачі місця на диску.</span>
+          </div>
+        </div>
+      `;
+    };
+
+    openPopover({
+      anchor,
+      side: 'left',
+      title: 'Резервні копії та дані',
+      width: 380,
+      html: `<div id="backup-popover-content" class="backup-popover-wrap">${renderContent()}</div>`,
+      onMount: (el) => {
+        const btnExport = el.querySelector('#btn-export-backup');
+        const fileImport = el.querySelector('#file-import-backup');
+
+        btnExport?.addEventListener('click', () => {
+          const data = StorageManager.exportBackup(this.state);
+          const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          const dateStr = new Date().toISOString().slice(0, 10);
+          a.href = url;
+          a.download = `тихий-клас-бекап-${dateStr}.json`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        });
+
+        fileImport?.addEventListener('change', (e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const res = StorageManager.importBackup(event.target.result);
+            if (res.success) {
+              this.callbacks.onStateReload?.(res.state);
+              closePopover();
+            } else {
+              alert(`Помилка: ${res.error}`);
+            }
+          };
+          reader.readAsText(file);
+        });
+
+        el.querySelectorAll('.btn-restore-snap').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const snapId = btn.dataset.snapId;
+            if (window.confirm('Відновити цей стан? Поточний стан буде збережено у резервну копію.')) {
+              const restored = StorageManager.restoreSnapshot(snapId);
+              if (restored) {
+                this.callbacks.onStateReload?.(restored);
+                closePopover();
+              }
+            }
+          });
         });
       },
     });

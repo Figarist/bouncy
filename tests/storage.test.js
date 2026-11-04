@@ -8,6 +8,8 @@ import {
   nextClassColor,
   CLASS_COLORS,
   MAX_PRIZE_HISTORY,
+  StorageManager,
+  MAX_SNAPSHOTS,
 } from '../src/game/storage.js';
 
 describe('renameClassRecord', () => {
@@ -74,5 +76,101 @@ describe('recordPrize & nextClassColor', () => {
   it('picks an unused palette color', () => {
     const color = nextClassColor({ A: createClassRecord({ color: CLASS_COLORS[0] }) });
     expect(color).toBe(CLASS_COLORS[1]);
+  });
+});
+
+describe('StorageManager snapshots & backups', () => {
+  // Mock localStorage in node environment if needed
+  const store = {};
+  globalThis.localStorage = {
+    getItem: (key) => store[key] || null,
+    setItem: (key, val) => {
+      store[key] = String(val);
+    },
+    removeItem: (key) => {
+      delete store[key];
+    },
+    clear: () => {
+      for (const k in store) delete store[k];
+    },
+  };
+
+  it('takes snapshots and caps at MAX_SNAPSHOTS (5)', () => {
+    localStorage.clear();
+    const state = {
+      activeClass: '1-А',
+      classes: { '1-А': createClassRecord({ stars: 3 }) },
+      settings: { ballScale: 1.5 },
+    };
+
+    for (let i = 0; i < 7; i++) {
+      StorageManager.takeSnapshot(state, `Зліпок ${i}`);
+    }
+
+    const snaps = StorageManager.getSnapshots();
+    expect(snaps).toHaveLength(MAX_SNAPSHOTS);
+    expect(snaps[0].label).toBe('Зліпок 6');
+  });
+
+  it('restores snapshot and creates safety snapshot', () => {
+    localStorage.clear();
+    const oldState = {
+      activeClass: 'Old',
+      classes: { Old: createClassRecord({ stars: 10 }) },
+      settings: {},
+    };
+    const snap = StorageManager.takeSnapshot(oldState, 'Старий стан');
+
+    const newState = {
+      activeClass: 'New',
+      classes: { New: createClassRecord({ stars: 1 }) },
+      settings: {},
+    };
+    StorageManager.save(newState);
+
+    const restored = StorageManager.restoreSnapshot(snap.id);
+    expect(restored.activeClass).toBe('Old');
+    expect(restored.classes['Old'].stars).toBe(10);
+
+    // Verify safety snapshot was created
+    const snapsAfter = StorageManager.getSnapshots();
+    expect(snapsAfter[0].label).toBe('Перед відновленням копії');
+  });
+
+  it('exports and imports backup JSON correctly and normalizes settings', () => {
+    const state = {
+      activeClass: '5-Б',
+      classes: { '5-Б': createClassRecord({ stars: 15, reward: 'Піца' }) },
+      settings: { ballScale: 3.5 },
+    };
+    const exported = StorageManager.exportBackup(state);
+    expect(exported.appName).toBe('tyhyi-klas');
+
+    const imported = StorageManager.importBackup(JSON.stringify(exported));
+    expect(imported.success).toBe(true);
+    expect(imported.state.classes['5-Б'].stars).toBe(15);
+    expect(imported.state.classes['5-Б'].reward).toBe('Піца');
+    expect(imported.state.settings.ballScale).toBe(2.0); // normalized to max 2.0x
+  });
+
+  it('rejects invalid backup JSON gracefully', () => {
+    const res = StorageManager.importBackup('not valid json');
+    expect(res.success).toBe(false);
+
+    const resEmpty = StorageManager.importBackup('{}');
+    expect(resEmpty.success).toBe(false);
+  });
+
+  it('normalizes ballScale (capped at 2.0x) and sidebarPos on load', () => {
+    localStorage.clear();
+    StorageManager.save({
+      activeClass: '4-Б',
+      classes: { '4-Б': createClassRecord() },
+      settings: { ballScale: 5.5, sidebarPos: { x: 120.4, y: 340.8 } },
+    });
+
+    const loaded = StorageManager.load();
+    expect(loaded.settings.ballScale).toBe(2.0); // clamped to 2.0
+    expect(loaded.settings.sidebarPos).toEqual({ x: 120, y: 341 });
   });
 });

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { Ball } from '../src/world/ball.js';
 
-describe('Ball mechanics & Roly-Poly upright physics', () => {
+describe('Ball mechanics, Squash stability & Roly-Poly upright physics', () => {
   it('initializes upright with near-zero angle', () => {
     const ball = new Ball(100, 100, 30, 0);
     expect(Math.abs(ball.angle)).toBeLessThan(0.2);
@@ -30,6 +30,27 @@ describe('Ball mechanics & Roly-Poly upright physics', () => {
 
     expect(ball.angle).toBeLessThanOrEqual(0.45);
     expect(ball.angle).toBeGreaterThanOrEqual(-0.45);
+  });
+
+  it('remains numerically stable during squash recovery even under large frame dt spikes (0.1s)', () => {
+    const ball = new Ball(100, 100, 30, 3);
+    ball.triggerSquash(0, 1, 20);
+
+    expect(ball.scaleX).toBeLessThanOrEqual(1.28);
+    expect(ball.scaleY).toBeGreaterThanOrEqual(0.72);
+
+    // Simulate laggy 10 FPS spikes (dt = 0.1s) where naive forward Euler would explode
+    for (let i = 0; i < 15; i++) {
+      ball.updateAnimation(0.1, 'green', false);
+      expect(ball.scaleX).toBeGreaterThanOrEqual(0.72);
+      expect(ball.scaleX).toBeLessThanOrEqual(1.28);
+      expect(ball.scaleY).toBeGreaterThanOrEqual(0.72);
+      expect(ball.scaleY).toBeLessThanOrEqual(1.28);
+    }
+
+    // Should have settled back to 1.0
+    expect(Math.abs(ball.scaleX - 1.0)).toBeLessThan(0.02);
+    expect(Math.abs(ball.scaleY - 1.0)).toBeLessThan(0.02);
   });
 
   it('assigns golden dream types to critters', () => {
