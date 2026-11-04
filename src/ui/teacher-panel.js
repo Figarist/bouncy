@@ -28,6 +28,7 @@ const THEMES = [
   { id: 'craft', title: 'Крафт-Куби', sub: 'Піксель-світ' },
   { id: 'blox', title: 'Блокс-Герої', sub: 'Оббі-аватари' },
   { id: 'brawl', title: 'Бійці Арени', sub: 'Зіркова ліга' },
+  { id: 'elements', title: 'Стихійці', sub: 'Звірята стихій' },
   { id: 'capy', title: 'Капібари', sub: 'Спокій' },
   { id: 'sweets', title: 'Смаколики', sub: 'Кавай-їжа' },
   { id: 'critters', title: 'Сплюшки', sub: 'Монстрики' },
