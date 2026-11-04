@@ -8,9 +8,11 @@ import { drawSpace } from './themes/space.js';
 import { drawCraft } from './themes/craft.js';
 import { drawBlox } from './themes/blox.js';
 import { drawBrawl } from './themes/brawl.js';
+import { drawCapy } from './themes/capy.js';
+import { drawSweet } from './themes/sweets.js';
 import { ParticleSystem } from '../world/particles.js';
 
-const ZZZ_THEMES = new Set(['critters', 'emoji', 'craft', 'blox', 'brawl']);
+const ZZZ_THEMES = new Set(['critters', 'emoji', 'craft', 'blox', 'brawl', 'capy', 'sweets']);
 
 export class CanvasRenderer {
   /**
@@ -157,6 +159,12 @@ export class CanvasRenderer {
           break;
         case 'brawl':
           drawBrawl(ctx, ball);
+          break;
+        case 'capy':
+          drawCapy(ctx, ball);
+          break;
+        case 'sweets':
+          drawSweet(ctx, ball);
           break;
         case 'plastic':
           drawPlastic(ctx, ball);

@@ -244,30 +244,65 @@ export function getThemeCardIllustration(themeId) {
   switch (themeId) {
     case 'craft':
       return `<svg viewBox="0 0 40 40" width="38" height="38">
-        <rect x="6" y="6" width="28" height="28" rx="5" fill="#40C057" stroke="#111827" stroke-width="2"/>
-        <rect x="8" y="8" width="24" height="5" rx="2" fill="#8CE99A"/>
-        <rect x="11" y="13" width="6" height="6" fill="#111827"/>
-        <rect x="23" y="13" width="6" height="6" fill="#111827"/>
-        <rect x="16" y="19" width="8" height="6" fill="#111827"/>
-        <rect x="13" y="23" width="4" height="6" fill="#111827"/>
-        <rect x="23" y="23" width="4" height="6" fill="#111827"/>
+        <rect x="6" y="6" width="28" height="28" rx="3" fill="#5DC24A"/>
+        <rect x="9.5" y="9.5" width="3.5" height="3.5" fill="#7AD866"/>
+        <rect x="23" y="23" width="3.5" height="3.5" fill="#3E9A33"/>
+        <rect x="27" y="9.5" width="3.5" height="3.5" fill="#3E9A33"/>
+        <rect x="6" y="6" width="28" height="3.5" fill="#FFFFFF" fill-opacity="0.2"/>
+        <rect x="9.5" y="13" width="7" height="7" fill="#14241A"/>
+        <rect x="23.5" y="13" width="7" height="7" fill="#14241A"/>
+        <rect x="16.5" y="20" width="7" height="3.5" fill="#14241A"/>
+        <rect x="13" y="23.5" width="14" height="3.5" fill="#14241A"/>
+        <rect x="13" y="27" width="3.5" height="3.5" fill="#14241A"/>
+        <rect x="23.5" y="27" width="3.5" height="3.5" fill="#14241A"/>
+        <rect x="6" y="6" width="28" height="28" rx="3" fill="none" stroke="#111827" stroke-width="2"/>
       </svg>`;
     case 'blox':
       return `<svg viewBox="0 0 40 40" width="38" height="38">
-        <rect x="14" y="4" width="12" height="4" rx="1.5" fill="#F59F00" stroke="#111827" stroke-width="1.8"/>
-        <rect x="7" y="7" width="26" height="26" rx="8" fill="#FFD43B" stroke="#111827" stroke-width="2"/>
-        <rect x="10" y="32" width="20" height="4" rx="2" fill="#1C7ED6" stroke="#111827" stroke-width="1.5"/>
-        <circle cx="15" cy="18" r="2.2" fill="#111827"/>
-        <circle cx="25" cy="18" r="2.2" fill="#111827"/>
-        <path d="M14 25 Q21 29 27 22" stroke="#111827" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+        <rect x="9" y="31" width="22" height="6" rx="2" fill="#1C7ED6" stroke="#111827" stroke-width="1.6"/>
+        <rect x="14.5" y="3" width="11" height="5" rx="1.5" fill="#D9B21F" stroke="#111827" stroke-width="1.6"/>
+        <rect x="6" y="6.5" width="28" height="27" rx="8" fill="#F5CD30" stroke="#111827" stroke-width="2"/>
+        <rect x="9" y="11" width="2.4" height="12" rx="1.2" fill="#FFFFFF" fill-opacity="0.45"/>
+        <ellipse cx="15" cy="19" rx="1.6" ry="2.6" fill="#111827"/>
+        <ellipse cx="25" cy="19" rx="1.6" ry="2.6" fill="#111827"/>
+        <path d="M14.5 24.5 Q20 29 25.5 24.5" stroke="#111827" stroke-width="2" fill="none" stroke-linecap="round"/>
       </svg>`;
     case 'brawl':
       return `<svg viewBox="0 0 40 40" width="38" height="38">
-        <circle cx="20" cy="6" r="4" fill="#FA5252" stroke="#111827" stroke-width="1.8"/>
-        <circle cx="20" cy="22" r="14" fill="#51CF66" stroke="#111827" stroke-width="2.4"/>
-        <circle cx="15" cy="19" r="2.8" fill="#18181B"/>
-        <circle cx="25" cy="19" r="2.8" fill="#18181B"/>
-        <circle cx="20" cy="26" r="3.2" fill="#18181B"/>
+        <path d="M14 9 Q19 2 25 0.5 Q24 5 27 9 Z" fill="#1864AB" stroke="#111827" stroke-width="1.8" stroke-linejoin="round"/>
+        <circle cx="20" cy="22" r="14.5" fill="#1864AB"/>
+        <circle cx="18.6" cy="20.3" r="14" fill="#4DABF7"/>
+        <ellipse cx="20" cy="32" rx="13" ry="8" fill="#F1F3F5"/>
+        <circle cx="20" cy="22" r="14.5" fill="none" stroke="#111827" stroke-width="2.4"/>
+        <ellipse cx="15" cy="18" rx="3" ry="3.4" fill="#FFFFFF" stroke="#111827" stroke-width="1.4"/>
+        <ellipse cx="25" cy="18" rx="3" ry="3.4" fill="#FFFFFF" stroke="#111827" stroke-width="1.4"/>
+        <circle cx="15.5" cy="18.6" r="1.6" fill="#111827"/>
+        <circle cx="25.5" cy="18.6" r="1.6" fill="#111827"/>
+        <path d="M11.5 13.5 L17.5 15 M28.5 13.5 L22.5 15" stroke="#111827" stroke-width="2.2" stroke-linecap="round"/>
+        <path d="M13 25 Q20 27 27 25 Q24 31 20 31 Q16 31 13 25 Z" fill="#111827"/>
+        <path d="M14.5 25.6 L16.5 28 L18.5 26 L20.5 28.2 L22.5 26 L24.5 28 L25.8 25.6 Z" fill="#FFFFFF"/>
+      </svg>`;
+    case 'capy':
+      return `<svg viewBox="0 0 40 40" width="38" height="38">
+        <ellipse cx="11" cy="11" rx="3.4" ry="2.8" fill="#A8703F" stroke="#2B1B12" stroke-width="1.4"/>
+        <ellipse cx="29" cy="11" rx="3.4" ry="2.8" fill="#A8703F" stroke="#2B1B12" stroke-width="1.4"/>
+        <circle cx="20" cy="23" r="14" fill="#D9A066" stroke="#2B1B12" stroke-width="1.8"/>
+        <rect x="13.5" y="23" width="13" height="9" rx="4" fill="#A8703F"/>
+        <path d="M13 19 H17 M23 19 H27" stroke="#2B1B12" stroke-width="1.8" stroke-linecap="round"/>
+        <path d="M18 25.5 L18.6 26.8 M22 25.5 L21.4 26.8" stroke="#2B1B12" stroke-width="1.4" stroke-linecap="round"/>
+        <circle cx="20" cy="7" r="5" fill="#FF922B" stroke="#2B1B12" stroke-width="1.5"/>
+        <ellipse cx="22" cy="2.4" rx="2.4" ry="1.1" fill="#51CF66" stroke="#2B1B12" stroke-width="1" transform="rotate(-25 22 2.4)"/>
+      </svg>`;
+    case 'sweets':
+      return `<svg viewBox="0 0 40 40" width="38" height="38">
+        <circle cx="20" cy="21" r="15" fill="#E8B07A" stroke="#2D1B2E" stroke-width="1.8"/>
+        <path d="M5.4 18 A15 15 0 0 1 34.6 18 L34.6 21 Q32 24 29.5 21.5 Q27 25 24.5 22 Q22 25.5 19.5 22 Q17 25 14.5 22 Q12 25 9.5 21.5 Q7 24 5.4 21 Z" fill="#F783AC" stroke="#2D1B2E" stroke-width="1.4" stroke-linejoin="round"/>
+        <path d="M12 13 l2 -1 M19 10 l1 2 M26 13 l2 1 M16 16 l2 0 M24 17 l1 -2" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round"/>
+        <ellipse cx="15.5" cy="27" rx="1.6" ry="2" fill="#2D1B2E"/>
+        <ellipse cx="24.5" cy="27" rx="1.6" ry="2" fill="#2D1B2E"/>
+        <path d="M18.4 30 Q19.2 31.2 20 30 Q20.8 31.2 21.6 30" stroke="#2D1B2E" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+        <ellipse cx="12" cy="30" rx="2" ry="1.2" fill="#FF6B81" fill-opacity="0.55"/>
+        <ellipse cx="28" cy="30" rx="2" ry="1.2" fill="#FF6B81" fill-opacity="0.55"/>
       </svg>`;
     case 'critters':
       return `<svg viewBox="0 0 40 40" width="38" height="38">

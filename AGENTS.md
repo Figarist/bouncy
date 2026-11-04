@@ -60,7 +60,7 @@ src/game/zones.js        Green/yellow/red state machine with debounce + hysteres
 src/game/stars.js        StarManager: star progress per zone, golden combo, manual stars
 src/game/session.js      Lesson mode + task timer (start / toggle / cancel)
 src/game/storage.js      localStorage load/save, rolling snapshots, JSON backup import/export, pure class helpers
-src/world/, src/render/  Verlet physics, particles, canvas renderer, 10 procedural themes
+src/world/, src/render/  Verlet physics, particles, canvas renderer, 12 procedural themes
 src/ui/hud.js            Top bar: traffic light + label, mode tabs, timer button/menu, big timer, star jar, gear
 src/ui/class-sidebar.js  Draggable physical class window: cards, leaderboard sort, medals, drag reorder, class editor
 src/ui/teacher-panel.js  Settings drawer: mic card, sensitivity, popovers (balls/scale, sound, backup, PWA install)

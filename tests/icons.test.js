@@ -67,8 +67,8 @@ describe('Icons & Visuals SVG generator', () => {
     expect(fullJar).toContain('<polygon');
   });
 
-  it('provides visual theme illustrations for all 10 themes including craft, blox, and brawl', () => {
-    const themes = ['craft', 'blox', 'brawl', 'critters', 'space', 'bubbles', 'emoji', 'plastic', 'numbers', 'eyes'];
+  it('provides visual theme illustrations for all 12 themes including craft, blox, brawl, capy and sweets', () => {
+    const themes = ['craft', 'blox', 'brawl', 'capy', 'sweets', 'critters', 'space', 'bubbles', 'emoji', 'plastic', 'numbers', 'eyes'];
     for (const th of themes) {
       const svg = getThemeCardIllustration(th);
       expect(svg).toContain('<svg');
