@@ -48,18 +48,34 @@ export class HUD {
         <!-- Left: Noise Traffic Light -->
         <div class="hud-left">
           <div class="traffic-light-meter liquid-glass-surface" id="traffic-light" title="Зелений — тихо, жовтий — шепіт, червоний — шумно">
-            <div class="traffic-dots">
-              <div class="light-dot green active" title="Тиша (зелена зона)"></div>
-              <div class="light-dot yellow" title="Шепіт (жовта зона)"></div>
-              <div class="light-dot red" title="Шум (червона зона)"></div>
+            <div class="traffic-light-pod" aria-label="Світлофор">
+              <div class="light-dot red" title="Шум (червона зона)">
+                <span class="light-glyph">!</span>
+              </div>
+              <div class="light-dot yellow" title="Шепіт (жовта зона)">
+                <span class="light-glyph">≈</span>
+              </div>
+              <div class="light-dot green active" title="Тиша (зелена зона)">
+                <span class="light-glyph">✓</span>
+              </div>
             </div>
-            <span class="traffic-label zone-green" id="traffic-label">Тихо</span>
-            <div class="sound-meter-wrap" id="sound-meter-wrap">
-              <div class="meter-threshold-tick yellow-tick" title="Поріг жовтої зони"></div>
-              <div class="meter-threshold-tick red-tick" title="Поріг червоної зони"></div>
-              <div class="db-bar" id="db-bar"></div>
+            <div class="traffic-info">
+              <div class="traffic-subtext" id="traffic-subtext">У класі тихо</div>
+              <div class="traffic-label zone-green" id="traffic-label">Тихо</div>
+              <div class="sound-meter-wrap" id="sound-meter-wrap" title="Рівень шуму в класі">
+                <div class="meter-zones-bg">
+                  <span class="meter-zone-track green-track"></span>
+                  <span class="meter-zone-track yellow-track"></span>
+                  <span class="meter-zone-track red-track"></span>
+                </div>
+                <div class="meter-threshold-tick yellow-tick" title="Поріг жовтої зони (шепіт)"></div>
+                <div class="meter-threshold-tick red-tick" title="Поріг червоної зони (шум)"></div>
+                <div class="db-bar" id="db-bar">
+                  <span class="db-bar-lead"></span>
+                </div>
+              </div>
             </div>
-            <button class="hud-icon-btn" id="cal-quick-btn" title="Запам'ятати тишу в класі (3 с)">
+            <button class="hud-icon-btn cal-quick-btn" id="cal-quick-btn" title="Запам'ятати тишу в класі (3 с)">
               ${iconCalibrate()}
             </button>
           </div>
@@ -176,11 +192,14 @@ export class HUD {
     this.dbBar = this.container.querySelector('#db-bar');
     this.timerBtn = this.container.querySelector('#hud-timer-btn');
     this.jarClassLabel = this.container.querySelector('#jar-class-label');
+    this.trafficLight = this.container.querySelector('#traffic-light');
+    this.trafficSubtext = this.container.querySelector('#traffic-subtext');
     this.trafficLabel = this.container.querySelector('#traffic-label');
     this.bigTimer = this.container.querySelector('#big-timer');
     this.bigTimerDigits = this.container.querySelector('#big-timer-digits');
     this.bigTimerFill = this.container.querySelector('#big-timer-fill');
     this.lastTrafficText = '';
+    this.lastTrafficSubtext = '';
     this.modeControl = this.container.querySelector('#hud-mode-control');
     this.timerDisplay = this.container.querySelector('#timer-display');
     this.timerDigits = this.container.querySelector('#timer-digits');
@@ -294,26 +313,58 @@ export class HUD {
     this.dotYellow.classList.toggle('active', zone === 'yellow');
     this.dotRed.classList.toggle('active', zone === 'red');
 
+    const pct = isCalibrating
+      ? Math.round(calProgress * 100)
+      : Math.min(100, Math.round((progress / 1.5) * 100));
+
     const labelText = isCalibrating ? 'Слухаю…' : ZONE_LABELS[zone] || ZONE_LABELS.green;
     if (labelText !== this.lastTrafficText) {
       this.lastTrafficText = labelText;
       this.trafficLabel.textContent = labelText;
       this.trafficLabel.className = `traffic-label zone-${isCalibrating ? 'yellow' : zone}`;
+      if (this.trafficLight) {
+        this.trafficLight.dataset.zone = isCalibrating ? 'calibrating' : zone;
+      }
     }
 
+    // Dynamic pedagogical hint: early warning helps kids quiet down in time
+    let subtext = '';
+    let subtextMode = 'normal';
     if (isCalibrating) {
-      this.dbBar.style.width = `${Math.round(calProgress * 100)}%`;
-      this.dbBar.style.background = 'var(--zone-yellow)';
+      subtext = 'Запам\'ятовую тишу…';
+      subtextMode = 'calibrating';
+    } else if (zone === 'red') {
+      subtext = 'Занадто шумно!';
+      subtextMode = 'alert';
+    } else if (zone === 'yellow') {
+      subtext = 'Тихше, будь ласка!';
+      subtextMode = 'warn';
+    } else if (pct >= 28) {
+      // Early warning while still technically in the green zone
+      subtext = 'Шум зростає…';
+      subtextMode = 'rising';
     } else {
-      const pct = Math.min(100, Math.round((progress / 1.5) * 100));
-      this.dbBar.style.width = `${pct}%`;
-      if (zone === 'red') {
-        this.dbBar.style.background = 'var(--zone-red)';
-      } else if (zone === 'yellow') {
-        this.dbBar.style.background = 'var(--zone-yellow)';
-      } else {
-        this.dbBar.style.background = 'var(--zone-green)';
-      }
+      subtext = 'У класі тихо';
+      subtextMode = 'quiet';
+    }
+
+    if (subtext !== this.lastTrafficSubtext) {
+      this.lastTrafficSubtext = subtext;
+      this.trafficSubtext.textContent = subtext;
+      this.trafficSubtext.className = `traffic-subtext ${subtextMode}`;
+    }
+
+    this.dbBar.style.width = `${pct}%`;
+    if (isCalibrating) {
+      this.dbBar.className = 'db-bar calibrating';
+    } else if (zone === 'red') {
+      this.dbBar.className = 'db-bar zone-red';
+    } else if (zone === 'yellow') {
+      this.dbBar.className = 'db-bar zone-yellow';
+    } else if (pct >= 28) {
+      this.dbBar.className = 'db-bar zone-rising';
+    } else {
+      this.dbBar.className = 'db-bar zone-green';
     }
   }
 
