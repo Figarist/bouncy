@@ -126,8 +126,8 @@ const DEFAULT_STATE = {
     lang: 'uk',
     ambientBaselineDb: -55,
     micDeviceId: '',
-    micProfile: 'webcam',
-    micGain: 2.2,
+    setupDone: false,
+
     sidebarCollapsed: false,
     sidebarSort: 'manual', // 'manual' (teacher's drag order) | 'stars' (leaderboard)
   },
@@ -155,6 +155,9 @@ function normalizeSettings(rawSettings) {
   out.volume = clamp(out.volume, 0, 1);
   out.alertRepeatSec = clamp(out.alertRepeatSec, 0, 60);
   out.sensitivity = clamp(Math.round(out.sensitivity), -15, 15);
+  if (out.ambientBaselineDb <= -72 || out.ambientBaselineDb > -15) {
+    out.ambientBaselineDb = -55;
+  }
   out.sidebarPos =
     s.sidebarPos && finite(s.sidebarPos.x, null) !== null && finite(s.sidebarPos.y, null) !== null
       ? { x: Math.round(s.sidebarPos.x), y: Math.round(s.sidebarPos.y) }

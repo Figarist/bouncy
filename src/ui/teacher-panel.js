@@ -23,6 +23,7 @@ import {
 } from './icons.js';
 import { openPopover, getOpenPopover, closePopover, escapeHtml } from './popover.js';
 import { StorageManager } from '../game/storage.js';
+import { SensitivityMeter } from './sensitivity-meter.js';
 
 const THEMES = [
   { id: 'craft', title: 'Крафт-Куби', sub: 'Піксель-світ' },
@@ -55,11 +56,6 @@ const REPEATS = [
   { sec: 0, title: '1 раз' },
 ];
 
-const PROFILES = [
-  { id: 'webcam', title: 'Вебкамера', hint: 'Камера на дошці, 2–4 м від дітей', icon: () => iconCamera() },
-  { id: 'laptop', title: 'Ноутбук', hint: 'Вбудований мікрофон', icon: () => iconLaptop() },
-  { id: 'close', title: 'Гарнітура', hint: 'Мікрофон поруч із вчителем', icon: () => iconMic(true) },
-];
 
 const HOTKEYS = [
   ['H', 'Відкрити / закрити налаштування'],
@@ -72,12 +68,6 @@ const HOTKEYS = [
   ['Space', 'Зупинити кульки'],
 ];
 
-function sensitivityLabel(val) {
-  if (val === 0) return 'Звичайна';
-  if (val > 0) return `Суворіше +${val}`;
-  return `М'якше ${val}`;
-}
-
 export class TeacherPanel {
   constructor(state, callbacks) {
     this.state = state;
@@ -89,6 +79,15 @@ export class TeacherPanel {
     this.lastWallX = typeof window !== 'undefined' ? window.innerWidth : 1200;
     this.lastWallTime = performance.now();
     this.wallVx = 0;
+
+    this.sensitivityWidget = new SensitivityMeter({
+      sensitivity: this.state.settings.sensitivity,
+      title: 'Чутливість до шуму',
+      onChange: (val) => {
+        this.state.settings.sensitivity = val;
+        this.callbacks.onSensitivity(val);
+      },
+    });
 
     this.panel = document.createElement('div');
     this.panel.className = 'teacher-panel closed';
@@ -133,22 +132,12 @@ export class TeacherPanel {
             </button>
           </div>
           <button class="row-link" id="row-mic-advanced">
-            ${iconSliders()} <span>Який мікрофон і підсилення</span> ${iconChevron('right')}
+            ${iconSliders()} <span>Вибір мікрофона і діагностика</span> ${iconChevron('right')}
           </button>
         </section>
 
         <!-- 2. Sensitivity -->
-        <section class="panel-card">
-          <div class="slider-header">
-            <span class="panel-card-title">Чутливість до шуму</span>
-            <span class="slider-val" id="val-sensitivity">${sensitivityLabel(s.sensitivity)}</span>
-          </div>
-          <input type="range" class="slider" id="slider-sensitivity" min="-15" max="15" step="1" value="${s.sensitivity}">
-          <div class="slider-hints">
-            <span>Дозволяє шуміти</span>
-            <span>Реагує на шепіт</span>
-          </div>
-        </section>
+        <section class="panel-card panel-card-sensitivity" id="card-sensitivity"></section>
 
         <!-- 3. Everything else: one-line rows that open a popover -->
         <section class="panel-list">
@@ -221,6 +210,8 @@ export class TeacherPanel {
         </div>
       </div>
     `;
+    this.sensitivityWidget.setValue(s.sensitivity);
+    this.panel.querySelector('#card-sensitivity')?.appendChild(this.sensitivityWidget.getElement());
   }
 
   formatBallScale(scale) {
@@ -275,13 +266,7 @@ export class TeacherPanel {
     this.panel.querySelector('#btn-toggle-mic').addEventListener('click', () => this.callbacks.onMicToggle());
     this.panel.querySelector('#btn-calibrate').addEventListener('click', () => this.callbacks.onCalibrate());
 
-    const sSens = this.panel.querySelector('#slider-sensitivity');
-    const vSens = this.panel.querySelector('#val-sensitivity');
-    sSens.addEventListener('input', () => {
-      const val = parseInt(sSens.value, 10);
-      vSens.textContent = sensitivityLabel(val);
-      this.callbacks.onSensitivity(val);
-    });
+    
 
     this.panel.querySelector('#row-mic-advanced').addEventListener('click', (e) => this.openMicPopover(e.currentTarget));
     this.panel.querySelector('#row-theme').addEventListener('click', (e) => this.openThemePopover(e.currentTarget));
@@ -553,7 +538,6 @@ export class TeacherPanel {
 
   openMicPopover(anchor) {
     const s = this.state.settings;
-    const gain = s.micGain ? Number(s.micGain) : 2.2;
     openPopover({
       anchor,
       side: 'left',
@@ -561,37 +545,38 @@ export class TeacherPanel {
       width: 340,
       html: `
         <label class="field">
-          <span class="field-label">Пристрій</span>
+          <span class="field-label">Пристрій введення</span>
           <select class="select-input" id="select-mic-device"></select>
         </label>
 
-        <span class="field-label">Де стоїть мікрофон</span>
-        <div class="profile-list">
-          ${PROFILES.map((p) => `
-            <button class="profile-row profile-chip-btn ${s.micProfile === p.id ? 'active' : ''}" data-profile="${p.id}">
-              ${p.icon()}
-              <span><b>${p.title}</b><small>${p.hint}</small></span>
-            </button>
-          `).join('')}
-        </div>
+        <button class="action-btn secondary" id="btn-popover-wizard" style="width: 100%; margin: 6px 0 12px 0;">
+          ${iconCalibrate()} <span>Налаштувати мікрофон ще раз (20 с)</span>
+        </button>
 
-        <div class="slider-header">
-          <span class="field-label">Підсилення</span>
-          <span class="slider-val" id="val-gain">${gain.toFixed(1)}×</span>
-        </div>
-        <input type="range" class="slider" id="slider-gain" min="0.5" max="4.5" step="0.1" value="${gain}">
-        <div class="slider-hints"><span>Тихіше</span><span>Голосніше</span></div>
-
-        <div class="mic-test-wrap">
-          <div class="mic-test-header">
-            <span>Рівень зараз</span>
-            <span id="mic-test-db">Вимк.</span>
+        <div class="mic-diag-card">
+          <div class="mic-diag-title">Що чує мікрофон зараз</div>
+          <div class="mic-diag-row">
+            <span>Шум зараз:</span>
+            <strong id="diag-current-db">Вимк.</strong>
           </div>
-          <div class="mic-vu-bar-bg">
-            <div class="mic-vu-bar-fill" id="mic-vu-fill"></div>
+          <div class="mic-diag-row">
+            <span>Тиша кабінету:</span>
+            <strong id="diag-ambient-db">${Math.round(s.ambientBaselineDb || -55)} dB</strong>
           </div>
-          <div class="mic-status-hint">
-            <span>Фон тиші: <strong id="hint-ambient">${Math.round(s.ambientBaselineDb || -55)} dB</strong></span>
+          <div class="mic-diag-row">
+            <span>Жовтий поріг:</span>
+            <strong id="diag-yellow-db">—</strong>
+          </div>
+          <div class="mic-diag-row">
+            <span>Червоний поріг:</span>
+            <strong id="diag-red-db">—</strong>
+          </div>
+          <div class="mic-diag-row">
+            <span>Автопідсилення (AGC):</span>
+            <strong id="diag-agc-val">Вимкнено</strong>
+          </div>
+          <div class="mic-diag-warn hidden" id="diag-warn-box">
+            Увага: рівень мікрофона в системі дуже високий. Якщо програма реагує на найменший звук, зменшіть гучність мікрофона в налаштуваннях Windows.
           </div>
         </div>
       `,
@@ -600,17 +585,9 @@ export class TeacherPanel {
         el.querySelector('#select-mic-device').addEventListener('change', (e) => {
           this.callbacks.onDeviceChange?.(e.target.value);
         });
-        el.querySelectorAll('.profile-chip-btn').forEach((btn) => {
-          btn.addEventListener('click', () => {
-            this.setProfileState(btn.dataset.profile);
-            this.callbacks.onProfileChange?.(btn.dataset.profile);
-          });
-        });
-        const sGain = el.querySelector('#slider-gain');
-        sGain.addEventListener('input', () => {
-          const val = parseFloat(sGain.value);
-          el.querySelector('#val-gain').textContent = `${val.toFixed(1)}×`;
-          this.callbacks.onGainChange?.(val);
+        el.querySelector('#btn-popover-wizard')?.addEventListener('click', () => {
+          closePopover();
+          this.callbacks.onRunWizard?.();
         });
       },
     });
@@ -677,48 +654,66 @@ export class TeacherPanel {
     this.fillDeviceSelect(this.$('#select-mic-device'));
   }
 
-  setGainValue(val) {
-    const sGain = this.$('#slider-gain');
-    const vGain = this.$('#val-gain');
-    if (sGain) sGain.value = val;
-    if (vGain) vGain.textContent = `${Number(val).toFixed(1)}×`;
-  }
-
-  setProfileState(profileId) {
-    getOpenPopover()?.querySelectorAll('.profile-chip-btn').forEach((btn) => {
-      btn.classList.toggle('active', btn.dataset.profile === profileId);
-    });
-  }
-
-  updateMicLiveMeter(rawDb, smoothedDb, ambientDb, yellowDb, redDb, isActive = true) {
+  
+  updateMicLiveMeter(rawDb, smoothedDb, ambientDb, yellowDb, redDb, isActive = true, isHot = false, processing = null, dtSec = 0.016) {
     if (!this.isOpen && !getOpenPopover()) return;
-
     const miniFill = this.panel.querySelector('#mini-meter-fill');
-    const fillEl = this.$('#mic-vu-fill');
-    const valEl = this.$('#mic-test-db');
-    const hintAmbient = this.$('#hint-ambient');
-    if (hintAmbient) hintAmbient.textContent = `${Math.round(ambientDb)} dB`;
-
     if (!isActive) {
-      if (valEl) valEl.textContent = 'Вимк.';
-      if (fillEl) fillEl.style.width = '0%';
       if (miniFill) miniFill.style.width = '0%';
-      return;
+    } else if (miniFill) {
+      const minScale = -75;
+      const maxScale = -15;
+      const pct = Math.max(0, Math.min(100, ((smoothedDb - minScale) / (maxScale - minScale)) * 100));
+      let color = 'var(--zone-green)';
+      if (smoothedDb >= redDb) color = 'var(--zone-red)';
+      else if (smoothedDb >= yellowDb) color = 'var(--zone-yellow)';
+      miniFill.style.width = `${pct}%`;
+      miniFill.style.background = color;
     }
 
-    const minScale = -75;
-    const maxScale = -15;
-    const pct = Math.max(0, Math.min(100, ((smoothedDb - minScale) / (maxScale - minScale)) * 100));
-    let color = 'var(--zone-green)';
-    if (smoothedDb >= redDb) color = 'var(--zone-red)';
-    else if (smoothedDb >= yellowDb) color = 'var(--zone-yellow)';
+    // Update sensitivity meter widget
+    this.sensitivityWidget.update({
+      currentDb: smoothedDb,
+      ambientDb,
+      yellowDb,
+      redDb,
+      isActive,
+      dtSec,
+    });
 
-    for (const el of [fillEl, miniFill]) {
-      if (!el) continue;
-      el.style.width = `${pct}%`;
-      el.style.background = color;
+    // Update diagnostic values in popover if open
+    const openPop = getOpenPopover();
+    if (openPop) {
+      const curEl = openPop.querySelector('#diag-current-db');
+      const ambEl = openPop.querySelector('#diag-ambient-db');
+      const yelEl = openPop.querySelector('#diag-yellow-db');
+      const redEl = openPop.querySelector('#diag-red-db');
+      const agcEl = openPop.querySelector('#diag-agc-val');
+      const warnEl = openPop.querySelector('#diag-warn-box');
+
+      if (curEl) curEl.textContent = isActive ? `${Math.round(smoothedDb)} dB` : 'Вимк.';
+      if (ambEl) ambEl.textContent = `${Math.round(ambientDb)} dB`;
+      if (yelEl) yelEl.textContent = `${Math.round(yellowDb)} dB`;
+      if (redEl) redEl.textContent = `${Math.round(redDb)} dB`;
+
+      if (agcEl && processing) {
+        if (processing.autoGainControl) {
+          agcEl.textContent = 'Увімкнено (може заважати)';
+          agcEl.style.color = 'var(--zone-yellow)';
+        } else {
+          agcEl.textContent = 'Вимкнено';
+          agcEl.style.color = 'var(--zone-green)';
+        }
+      }
+
+      if (warnEl) {
+        warnEl.classList.toggle('hidden', !isHot);
+      }
     }
-    if (valEl) valEl.textContent = `${Math.round(smoothedDb)} dB`;
+  }
+
+  setSensitivityValue(val) {
+    this.sensitivityWidget.setValue(val);
   }
 
   setMicButtonState(isListening) {

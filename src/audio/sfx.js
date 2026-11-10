@@ -86,10 +86,11 @@ export class SoundSynthesizer {
    * Returns true if a sound is currently playing or recently played within muteWindowMs.
    * Used to prevent microphone feedback loop from TV speakers.
    */
-  isMutingMic(muteWindowMs = 700) {
+  isMutingMic(muteWindowMs = 1200) {
     if (!this.ctx) return false;
     const nowMs = performance.now();
-    return nowMs < this.lastSfxEndTime + muteWindowMs;
+    const extraLatencyMs = (this.ctx.outputLatency || 0) * 1000;
+    return nowMs < this.lastSfxEndTime + muteWindowMs + extraLatencyMs;
   }
 
   markSfxPlaying(durationMs) {

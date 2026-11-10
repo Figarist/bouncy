@@ -23,6 +23,7 @@ import { TeacherPanel } from './ui/teacher-panel.js';
 import { ClassSidebar } from './ui/class-sidebar.js';
 import { getOpenPopover } from './ui/popover.js';
 import { HotkeyManager } from './ui/hotkeys.js';
+import { SetupWizard } from './ui/setup-wizard.js';
 import { IntroOverlay } from './ui/intro.js';
 import { iconLab } from './ui/icons.js';
 import { initServiceWorker } from './ui/update-notice.js';
@@ -38,8 +39,7 @@ class GameApp {
     this.mic = new MicrophoneInput();
     this.mic.ambientBaselineDb = this.state.settings.ambientBaselineDb || -55;
     this.mic.deviceId = this.state.settings.micDeviceId || '';
-    this.mic.profile = this.state.settings.micProfile || 'webcam';
-    this.mic.gainMultiplier = this.state.settings.micGain || 2.2;
+    this.setupWizard = null;
 
     // Game state
     const modeCfg = CONFIG.modes[this.state.settings.mode] || CONFIG.modes.quiet;
@@ -253,17 +253,8 @@ class GameApp {
         this.saveState();
         await this.mic.switchDevice(deviceId);
       },
-      onProfileChange: (profileId) => {
-        this.state.settings.micProfile = profileId;
-        this.mic.setProfile(profileId);
-        this.state.settings.micGain = this.mic.gainMultiplier;
-        this.panel.setGainValue(this.mic.gainMultiplier);
-        this.saveState();
-      },
-      onGainChange: (gain) => {
-        this.state.settings.micGain = gain;
-        this.mic.setGain(gain);
-        this.saveState();
+      onRunWizard: () => {
+        this.openSetupWizard();
       },
       onSensitivity: (val) => {
         this.state.settings.sensitivity = val;
@@ -300,8 +291,6 @@ class GameApp {
 
         this.mic.ambientBaselineDb = s.ambientBaselineDb || -55;
         this.mic.deviceId = s.micDeviceId || '';
-        this.mic.setProfile(s.micProfile || 'webcam');
-        this.mic.setGain(s.micGain || 2.2);
 
         this.switchClass(this.state.activeClass);
         this.sidebar.render();
@@ -370,9 +359,40 @@ class GameApp {
   }
 
   calibrateMic() {
+    this.zones.reset();
     this.mic.startCalibration(CONFIG.calibrationMs);
     this.wasCalibrating = this.mic.isCalibrating;
     this.panel.setCalibrateButtonState(this.mic.isCalibrating);
+  }
+
+  openSetupWizard() {
+    if (this.setupWizard) {
+      this.setupWizard.close();
+    }
+    this.setupWizard = new SetupWizard({
+      mic: this.mic,
+      currentSensitivity: this.state.settings.sensitivity,
+      onSensitivityChange: (val) => {
+        this.state.settings.sensitivity = val;
+        this.panel.setSensitivityValue(val);
+        this.saveState();
+      },
+      onFinish: (suggestedSensitivity) => {
+        this.state.settings.sensitivity = suggestedSensitivity;
+        this.state.settings.setupDone = true;
+        this.state.settings.ambientBaselineDb = this.mic.ambientBaselineDb;
+        this.saveState();
+        this.panel.setSensitivityValue(suggestedSensitivity);
+        this.setupWizard = null;
+      },
+      onSkip: () => {
+        this.state.settings.setupDone = true;
+        this.saveState();
+        this.setupWizard = null;
+        this.calibrateMic();
+      },
+    });
+    this.setupWizard.open();
   }
 
   awardStarWithFlight() {
@@ -451,7 +471,11 @@ class GameApp {
     if (ok) {
       const devices = await this.mic.listDevices();
       this.panel.populateAudioDevices(devices, this.mic.deviceId);
-      this.calibrateMic();
+      if (!this.state.settings.setupDone) {
+        this.openSetupWizard();
+      } else {
+        this.calibrateMic();
+      }
     } else {
       this.hud.showMicBlockedHelp();
     }
@@ -632,8 +656,6 @@ class GameApp {
   saveState() {
     this.state.settings.ambientBaselineDb = this.mic.ambientBaselineDb;
     this.state.settings.micDeviceId = this.mic.deviceId;
-    this.state.settings.micProfile = this.mic.profile;
-    this.state.settings.micGain = this.mic.gainMultiplier;
     StorageManager.save(this.state);
   }
 
@@ -659,10 +681,14 @@ class GameApp {
 
     // 1. Audio Sampling
     const sample = this.mic.sample(this.simulatedDb);
+    const isBusyEngine = sample.isCalibrating || sample.isVoiceCheck;
+
     if (sample.isCalibrating !== this.wasCalibrating) {
       this.wasCalibrating = sample.isCalibrating;
       this.panel.setCalibrateButtonState(sample.isCalibrating);
       if (!sample.isCalibrating) {
+        this.zones.reset();
+        this.lastAlertTime = now + 1500;
         this.saveState();
       }
     }
@@ -677,6 +703,11 @@ class GameApp {
       this.state.settings.sensitivity
     );
 
+    // Live update setup wizard if open
+    if (this.setupWizard?.isOpen) {
+      this.setupWizard.update(sample, evalResult, dt);
+    }
+
     // Live VU meter in Teacher Panel
     const isSignalActive = this.mic.isListening || this.simulatedDb !== null;
     this.panel.updateMicLiveMeter(
@@ -685,18 +716,25 @@ class GameApp {
       sample.ambientDb,
       evalResult.yellowDb,
       evalResult.redDb,
-      isSignalActive
+      isSignalActive,
+      sample.isHot,
+      sample.processing,
+      dt
     );
 
     // 3. Zone State Machine Update
+    if (isBusyEngine) {
+      this.zones.reset();
+    }
+    const zoneDtMs = isBusyEngine || sample.frozen ? 0 : dt * 1000;
     const zoneState = this.zones.update(
       sample.db,
       evalResult.yellowDb,
       evalResult.redDb,
-      dt * 1000
+      zoneDtMs
     );
 
-    const currentZone = zoneState.zone;
+    const currentZone = isBusyEngine ? 'green' : zoneState.zone;
     const activeClassData = this.state.classes[this.state.activeClass];
 
     // Track quiet time statistics for active class when mic is active
@@ -710,34 +748,36 @@ class GameApp {
       }
     }
 
-    // 4. Physical reaction to voice across modes (Significantly boosted!)
-    if (modeConfig.id === 'breaktime') {
-      if (evalResult.progress > 0.2) {
-        const impulse = (evalResult.progress - 0.18) * 38;
-        this.physics.bounceBalls(impulse);
-      }
-    } else {
-      if (evalResult.progress > 0.25 && currentZone === 'green') {
-        this.physics.voicePulse(evalResult.progress);
-      }
+    // 4. Physical reaction to voice across modes (paused while calibrating)
+    if (!isBusyEngine) {
+      if (modeConfig.id === 'breaktime') {
+        if (evalResult.progress > 0.2) {
+          const impulse = (evalResult.progress - 0.18) * 38;
+          this.physics.bounceBalls(impulse);
+        }
+      } else {
+        if (evalResult.progress > 0.25 && currentZone === 'green') {
+          this.physics.voicePulse(evalResult.progress);
+        }
 
-      if (currentZone === 'yellow' || (evalResult.progress >= 0.55 && currentZone !== 'red')) {
-        this.physics.stirBalls(evalResult.progress * 1.25);
-      }
+        if (currentZone === 'yellow' || (evalResult.progress >= 0.55 && currentZone !== 'red')) {
+          this.physics.stirBalls(evalResult.progress * 1.25);
+        }
 
-      if (currentZone === 'red') {
-        if (zoneState.changed) {
-          this.physics.scareBounce(1.75);
-          this.hud.triggerScreenShake();
-          this.hud.triggerJarBounce();
-        } else {
-          this.physics.chaosAgitate(Math.max(1.0, evalResult.progress * 1.35));
+        if (currentZone === 'red') {
+          if (zoneState.changed) {
+            this.physics.scareBounce(1.75);
+            this.hud.triggerScreenShake();
+            this.hud.triggerJarBounce();
+          } else {
+            this.physics.chaosAgitate(Math.max(1.0, evalResult.progress * 1.35));
+          }
         }
       }
     }
 
     // 4b. Alert Sound & Repeating Signal during sustained Red Zone noise
-    if (currentZone === 'red') {
+    if (currentZone === 'red' && !isBusyEngine && !sample.frozen) {
       const repeatSec = this.state.settings.alertRepeatSec ?? CONFIG.defaultAlertRepeatSec;
       const repeatMs = repeatSec > 0 ? repeatSec * 1000 : 0;
       const shouldPlayInitial = zoneState.changed && (now - this.lastAlertTime > CONFIG.alertCooldownMs);
@@ -756,7 +796,7 @@ class GameApp {
     }
 
     // 5. Star Rewards Update
-    const starRes = this.stars.update(currentZone, dt, modeConfig.rewardsEnabled);
+    const starRes = this.stars.update(currentZone, isBusyEngine ? 0 : dt, modeConfig.rewardsEnabled);
     if (starRes.starAwarded) {
       if (activeClassData) {
         activeClassData.totalStars = (activeClassData.totalStars || 0) + 1;
@@ -778,7 +818,7 @@ class GameApp {
     }
 
     // 6. Task Timer Update (+1 task statistic on completion!)
-    const timerRes = this.session.update(realDt, currentZone);
+    const timerRes = this.session.update(isBusyEngine ? 0 : realDt, currentZone);
     if (timerRes.completed) {
       if (activeClassData) {
         activeClassData.tasksCompleted = (activeClassData.tasksCompleted || 0) + 1;
@@ -820,7 +860,8 @@ class GameApp {
       currentZone,
       evalResult.progress,
       sample.isCalibrating,
-      sample.calibrationProgress
+      sample.calibrationProgress,
+      sample.newNoiseHint
     );
     this.hud.updateStars(
       this.displayedStars,

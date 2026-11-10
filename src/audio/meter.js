@@ -40,17 +40,17 @@ export function smooth(prev, next, dt, attack = 0.04, release = 0.35) {
 
 /**
  * Calibrates the ambient room noise floor from collected dB samples.
- * Uses a lower percentile (default 25th percentile) so background silence
+ * Uses a lower percentile (default 20th percentile) so background silence
  * defines the baseline noise floor, ignoring transient clicks, coughs, or speech.
- * Also clamps to safe bounds so calibration in a loud room never renders the app deaf.
+ * Clamps to safe bounds so calibration in a loud room never renders the app deaf.
  *
  * @param {number[]} dbSamples
- * @param {number} [percentile=0.25]
+ * @param {number} [percentile=0.20]
  * @param {number} [minDb=-75]
- * @param {number} [maxDb=-44]
+ * @param {number} [maxDb=-15]
  * @returns {number} Ambient baseline in dB (e.g. -55 dB)
  */
-export function calibrate(dbSamples, percentile = 0.25, minDb = -75, maxDb = -44) {
+export function calibrate(dbSamples, percentile = 0.20, minDb = -75, maxDb = -15) {
   if (!dbSamples || dbSamples.length === 0) return -55;
   const sorted = [...dbSamples].sort((a, b) => a - b);
   const idx = Math.min(sorted.length - 1, Math.max(0, Math.floor(sorted.length * percentile)));
@@ -87,9 +87,15 @@ export function evaluateLevel(currentDb, ambientDb, yellowOffset, redOffset, sen
   } else {
     rawZone = 'green';
     // Below yellow: progress 0.0 to 0.6
-    const minDb = ambientDb - 10;
-    const span = Math.max(0.5, yellowDb - minDb);
-    progress = Math.max(0, 0.6 * ((currentDb - minDb) / span));
+    // Silence deadband: at and below ambientDb + 1.5 dB, progress is strictly 0.0.
+    // As sound approaches yellowDb, progress smoothly scales from 0.0 to 0.6.
+    const greenFloor = ambientDb + 1.5;
+    const span = Math.max(0.5, yellowDb - greenFloor);
+    if (currentDb <= greenFloor) {
+      progress = 0;
+    } else {
+      progress = Math.max(0, 0.6 * ((currentDb - greenFloor) / span));
+    }
   }
 
   return {
@@ -98,5 +104,55 @@ export function evaluateLevel(currentDb, ambientDb, yellowOffset, redOffset, sen
     yellowDb,
     redDb,
     currentDb,
+  };
+}
+
+/**
+ * Automatically computes suggested sensitivity based on calibrated floor and detected voice level.
+ * @param {number} floorDb Ambient silence level in dBFS
+ * @param {number} voiceDb Normal speaking voice level in dBFS
+ * @param {number} [targetRedOffset=9.0] Default red offset in dB
+ * @returns {number} Suggested sensitivity integer (-15 to +15)
+ */
+export function suggestSensitivity(floorDb, voiceDb, targetRedOffset = 9.0) {
+  const delta = Math.max(0, (voiceDb || floorDb) - floorDb);
+  // Red alert should trigger at roughly 55% of the distance between silence and speech (at least 4 dB)
+  const redAt = Math.max(4, 0.55 * delta);
+  const suggested = Math.round(targetRedOffset - redAt);
+  return Math.max(-15, Math.min(15, suggested));
+}
+
+/**
+ * Returns plain-Ukrainian diagnostic verdict for the sensitivity slider.
+ * @param {object} params
+ * @param {number} params.currentDb
+ * @param {number} params.ambientDb
+ * @param {number} params.yellowDb
+ * @param {number} params.redDb
+ * @param {string} [params.recentMaxZone] 'green' | 'yellow' | 'red'
+ * @returns {{ status: 'too-loud'|'warning'|'good'|'idle', text: string }}
+ */
+export function sensitivityVerdict({ currentDb, ambientDb, yellowDb, redDb, recentMaxZone = 'green' }) {
+  if (currentDb >= redDb) {
+    return {
+      status: 'too-loud',
+      text: 'Занадто чутливо — навіть у тиші світиться червоний! Посуньте повзунок вліво.',
+    };
+  }
+  if (currentDb >= yellowDb) {
+    return {
+      status: 'warning',
+      text: 'У класі чути шум або повзунок занадто чутливий. Посуньте трохи вліво.',
+    };
+  }
+  if (recentMaxZone === 'red' || recentMaxZone === 'yellow') {
+    return {
+      status: 'good',
+      text: 'Працює чудово: голос вмикає світлофор, а в тиші він спокійний.',
+    };
+  }
+  return {
+    status: 'idle',
+    text: 'Зараз тихо — світлофор зелений. Скажіть щось уголос, щоб перевірити.',
   };
 }
