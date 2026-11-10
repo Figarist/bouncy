@@ -91,29 +91,61 @@ describe('Audio Meter pure functions', () => {
     const close = suggestSensitivity(-65, -30);
     expect(close).toBeLessThanOrEqual(-8);
 
-    // 3. Clamped between -15 and +15
-    expect(suggestSensitivity(-80, 0)).toBeGreaterThanOrEqual(-15);
-    expect(suggestSensitivity(-50, -50)).toBeLessThanOrEqual(15);
+    // 3. Clamped between -25 and +25
+    expect(suggestSensitivity(-80, 0)).toBeGreaterThanOrEqual(-25);
+    expect(suggestSensitivity(-50, -50)).toBeLessThanOrEqual(25);
   });
 
-  it('sensitivityVerdict returns proper guidance in Ukrainian', () => {
+  it('guarantees yellow threshold never drops into ambient silence even at extreme sensitivity', () => {
+    const ambient = -55;
+    const yellowOffset = 4.5;
+    const redOffset = 9.0;
+
+    // At extreme high sensitivity (+25), target yellow would be -55 + 4.5 - 25 = -75.5 dB (way below silence!)
+    // Clamped so yellowDb is at least ambient + 2.0 dB (-53 dB)
+    const res = evaluateLevel(-55, ambient, yellowOffset, redOffset, 25);
+    expect(res.yellowDb).toBeGreaterThanOrEqual(ambient + 2.0);
+    expect(res.redDb).toBeGreaterThanOrEqual(res.yellowDb + 3.0);
+    // In complete silence (-55 dB), rawZone MUST remain green and progress must be 0
+    expect(res.rawZone).toBe('green');
+    expect(res.progress).toBe(0);
+  });
+
+  it('sensitivityVerdict returns proper guidance in Ukrainian and respects currentZone', () => {
     // Too loud (in red)
     const vRed = sensitivityVerdict({ currentDb: -40, ambientDb: -55, yellowDb: -50, redDb: -45 });
     expect(vRed.status).toBe('too-loud');
     expect(vRed.text).toContain('Занадто чутливо');
 
+    // Warning (in yellow)
+    const vYellow = sensitivityVerdict({ currentDb: -48, ambientDb: -55, yellowDb: -50, redDb: -45, currentZone: 'yellow' });
+    expect(vYellow.status).toBe('warning');
+    expect(vYellow.text).toContain('У класі чути шепіт');
+
     // Idle quiet
     const vQuiet = sensitivityVerdict({ currentDb: -55, ambientDb: -55, yellowDb: -50, redDb: -45 });
     expect(vQuiet.status).toBe('idle');
 
-    // Good active response
+    // Good active response (when quiet now but sound was recently verified)
     const vGood = sensitivityVerdict({
       currentDb: -55,
       ambientDb: -55,
       yellowDb: -50,
       redDb: -45,
+      currentZone: 'green',
       recentMaxZone: 'red',
     });
     expect(vGood.status).toBe('good');
+
+    // Crucial bugfix: If currentZone is yellow, it must NEVER return 'good' even if recentMaxZone is set
+    const vYellowWithRecent = sensitivityVerdict({
+      currentDb: -51,
+      ambientDb: -55,
+      yellowDb: -50,
+      redDb: -45,
+      currentZone: 'yellow',
+      recentMaxZone: 'yellow',
+    });
+    expect(vYellowWithRecent.status).toBe('warning');
   });
 });

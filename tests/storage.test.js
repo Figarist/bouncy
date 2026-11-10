@@ -91,6 +91,20 @@ describe('normalizeState', () => {
     expect(s.settings).not.toHaveProperty('evil');
   });
 
+  it('clamps sensitivity between -25 and +25', () => {
+    const sLow = normalizeState({
+      classes: { A: createClassRecord() },
+      settings: { sensitivity: -40 },
+    });
+    expect(sLow.settings.sensitivity).toBe(-25);
+
+    const sHigh = normalizeState({
+      classes: { A: createClassRecord() },
+      settings: { sensitivity: 50 },
+    });
+    expect(sHigh.settings.sensitivity).toBe(25);
+  });
+
   it('resets corrupted ratchet baseline back to -55 dB', () => {
     const s = normalizeState({
       classes: { A: createClassRecord() },

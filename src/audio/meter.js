@@ -61,16 +61,33 @@ export function calibrate(dbSamples, percentile = 0.20, minDb = -75, maxDb = -15
 /**
  * Normalizes current dB level against ambient baseline and mode offsets.
  * Returns normalized progress (0 to 1.5 scale) and current raw zone estimation.
+ * Safety guard: yellowDb is guaranteed to stay at least minYellowMargin above ambientDb,
+ * and redDb at least minRedMargin above yellowDb, so the app NEVER triggers in ambient silence.
+ *
  * @param {number} currentDb
  * @param {number} ambientDb
  * @param {number} yellowOffset
  * @param {number} redOffset
- * @param {number} [sensitivity=0] slider offset (-15 to +15 dB)
+ * @param {number} [sensitivity=0] slider offset (-25 to +25 dB)
+ * @param {number} [minYellowMargin=2.0] minimum delta between ambient and yellow threshold
+ * @param {number} [minRedMargin=3.0] minimum delta between yellow and red threshold
  */
-export function evaluateLevel(currentDb, ambientDb, yellowOffset, redOffset, sensitivity = 0) {
+export function evaluateLevel(
+  currentDb,
+  ambientDb,
+  yellowOffset,
+  redOffset,
+  sensitivity = 0,
+  minYellowMargin = 2.0,
+  minRedMargin = 3.0
+) {
   // Positive sensitivity lowers thresholds (makes app more sensitive to noise)
-  const yellowDb = ambientDb + yellowOffset - sensitivity;
-  const redDb = ambientDb + redOffset - sensitivity;
+  // Negative sensitivity raises thresholds (makes app more tolerant / relaxed)
+  const targetYellow = ambientDb + yellowOffset - sensitivity;
+  const yellowDb = Math.max(ambientDb + minYellowMargin, targetYellow);
+
+  const targetRed = ambientDb + redOffset - sensitivity;
+  const redDb = Math.max(yellowDb + minRedMargin, targetRed);
 
   let rawZone = 'green';
   let progress = 0; // 0..1.5 scale for the traffic light / meter bar
@@ -87,9 +104,9 @@ export function evaluateLevel(currentDb, ambientDb, yellowOffset, redOffset, sen
   } else {
     rawZone = 'green';
     // Below yellow: progress 0.0 to 0.6
-    // Silence deadband: at and below ambientDb + 1.5 dB, progress is strictly 0.0.
+    // Silence deadband: at and below ambientDb + 1.2 dB, progress is strictly 0.0.
     // As sound approaches yellowDb, progress smoothly scales from 0.0 to 0.6.
-    const greenFloor = ambientDb + 1.5;
+    const greenFloor = ambientDb + 1.2;
     const span = Math.max(0.5, yellowDb - greenFloor);
     if (currentDb <= greenFloor) {
       progress = 0;
@@ -112,14 +129,14 @@ export function evaluateLevel(currentDb, ambientDb, yellowOffset, redOffset, sen
  * @param {number} floorDb Ambient silence level in dBFS
  * @param {number} voiceDb Normal speaking voice level in dBFS
  * @param {number} [targetRedOffset=9.0] Default red offset in dB
- * @returns {number} Suggested sensitivity integer (-15 to +15)
+ * @returns {number} Suggested sensitivity integer (-25 to +25)
  */
 export function suggestSensitivity(floorDb, voiceDb, targetRedOffset = 9.0) {
   const delta = Math.max(0, (voiceDb || floorDb) - floorDb);
   // Red alert should trigger at roughly 55% of the distance between silence and speech (at least 4 dB)
   const redAt = Math.max(4, 0.55 * delta);
   const suggested = Math.round(targetRedOffset - redAt);
-  return Math.max(-15, Math.min(15, suggested));
+  return Math.max(-25, Math.min(25, suggested));
 }
 
 /**
@@ -129,20 +146,23 @@ export function suggestSensitivity(floorDb, voiceDb, targetRedOffset = 9.0) {
  * @param {number} params.ambientDb
  * @param {number} params.yellowDb
  * @param {number} params.redDb
+ * @param {string|null} [params.currentZone] optional active zone from ZoneStateMachine
  * @param {string} [params.recentMaxZone] 'green' | 'yellow' | 'red'
  * @returns {{ status: 'too-loud'|'warning'|'good'|'idle', text: string }}
  */
-export function sensitivityVerdict({ currentDb, ambientDb, yellowDb, redDb, recentMaxZone = 'green' }) {
-  if (currentDb >= redDb) {
+export function sensitivityVerdict({ currentDb, ambientDb, yellowDb, redDb, currentZone = null, recentMaxZone = 'green' }) {
+  const effectiveZone = currentZone || (currentDb >= redDb ? 'red' : currentDb >= yellowDb ? 'yellow' : 'green');
+
+  if (effectiveZone === 'red') {
     return {
       status: 'too-loud',
-      text: 'Занадто чутливо — навіть у тиші світиться червоний! Посуньте повзунок вліво.',
+      text: 'Занадто чутливо — світлофор червоний! Посуньте повзунок ліворуч (до «Спокійно»).',
     };
   }
-  if (currentDb >= yellowDb) {
+  if (effectiveZone === 'yellow') {
     return {
       status: 'warning',
-      text: 'У класі чути шум або повзунок занадто чутливий. Посуньте трохи вліво.',
+      text: 'У класі чути шепіт або фоновий шум. Посуньте повзунок ліворуч або натисніть «Запам\'ятати тишу».',
     };
   }
   if (recentMaxZone === 'red' || recentMaxZone === 'yellow') {

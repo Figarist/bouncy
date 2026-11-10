@@ -33,11 +33,11 @@ export class SensitivityMeter {
         <span class="panel-card-title">${this.title}</span>
         <span class="slider-val" id="sm-val">${sensitivityLabel(this.sensitivity)}</span>
       </div>
-      <input type="range" class="slider" id="sm-slider" min="-15" max="15" step="1" value="${this.sensitivity}">
+      <input type="range" class="slider" id="sm-slider" min="-25" max="25" step="1" value="${this.sensitivity}">
       <div class="slider-hints">
-        <span>Спокійно (−15)</span>
+        <span>Спокійно (−25)</span>
         <span>Звичайно (0)</span>
-        <span>Чутливо (+15)</span>
+        <span>Чутливо (+25)</span>
       </div>
 
       <div class="sm-live-bar-wrap">
@@ -95,10 +95,11 @@ export class SensitivityMeter {
    * @param {number} params.ambientDb
    * @param {number} params.yellowDb
    * @param {number} params.redDb
+   * @param {string|null} [params.currentZone=null]
    * @param {boolean} [params.isActive=true]
    * @param {number} [params.dtSec=0.016]
    */
-  update({ currentDb, ambientDb, yellowDb, redDb, isActive = true, dtSec = 0.016 }) {
+  update({ currentDb, ambientDb, yellowDb, redDb, currentZone = null, isActive = true, dtSec = 0.016 }) {
     if (!this.container.isConnected) return;
 
     if (!isActive) {
@@ -110,8 +111,8 @@ export class SensitivityMeter {
       return;
     }
 
-    // Dynamic zone range: from ambient floor up to ambient + 24 dB
-    const rangeSpan = 24.0;
+    // Dynamic zone range: from ambient floor up to ambient + 32 dB
+    const rangeSpan = 32.0;
     const minScale = ambientDb;
 
     const yellowRel = Math.max(1, Math.min(rangeSpan - 1, yellowDb - minScale));
@@ -130,16 +131,16 @@ export class SensitivityMeter {
     if (this.elPin) {
       this.elPin.style.left = `${pinPct}%`;
       let pinColor = 'var(--zone-green)';
-      if (currentDb >= redDb) pinColor = 'var(--zone-red)';
-      else if (currentDb >= yellowDb) pinColor = 'var(--zone-yellow)';
+      if (currentZone === 'red' || currentDb >= redDb) pinColor = 'var(--zone-red)';
+      else if (currentZone === 'yellow' || currentDb >= yellowDb) pinColor = 'var(--zone-yellow)';
       this.elPin.style.setProperty('--pin-color', pinColor);
     }
 
     // Track recent non-green zone for verdict responsiveness (resets after 4s of quiet)
-    if (currentDb >= redDb) {
+    if (currentZone === 'red' || currentDb >= redDb) {
       this.recentMaxZone = 'red';
       this.recentMaxZoneTimer = 4.0;
-    } else if (currentDb >= yellowDb && this.recentMaxZone !== 'red') {
+    } else if ((currentZone === 'yellow' || currentDb >= yellowDb) && this.recentMaxZone !== 'red') {
       this.recentMaxZone = 'yellow';
       this.recentMaxZoneTimer = 3.0;
     } else if (this.recentMaxZoneTimer > 0) {
@@ -154,6 +155,7 @@ export class SensitivityMeter {
       ambientDb,
       yellowDb,
       redDb,
+      currentZone,
       recentMaxZone: this.recentMaxZone,
     });
 

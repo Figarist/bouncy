@@ -655,7 +655,7 @@ export class TeacherPanel {
   }
 
   
-  updateMicLiveMeter(rawDb, smoothedDb, ambientDb, yellowDb, redDb, isActive = true, isHot = false, processing = null, dtSec = 0.016) {
+  updateMicLiveMeter(rawDb, smoothedDb, ambientDb, yellowDb, redDb, currentZone = null, isActive = true, isHot = false, processing = null, dtSec = 0.016) {
     if (!this.isOpen && !getOpenPopover()) return;
     const miniFill = this.panel.querySelector('#mini-meter-fill');
     if (!isActive) {
@@ -665,8 +665,8 @@ export class TeacherPanel {
       const maxScale = -15;
       const pct = Math.max(0, Math.min(100, ((smoothedDb - minScale) / (maxScale - minScale)) * 100));
       let color = 'var(--zone-green)';
-      if (smoothedDb >= redDb) color = 'var(--zone-red)';
-      else if (smoothedDb >= yellowDb) color = 'var(--zone-yellow)';
+      if (currentZone === 'red' || smoothedDb >= redDb) color = 'var(--zone-red)';
+      else if (currentZone === 'yellow' || smoothedDb >= yellowDb) color = 'var(--zone-yellow)';
       miniFill.style.width = `${pct}%`;
       miniFill.style.background = color;
     }
@@ -677,6 +677,7 @@ export class TeacherPanel {
       ambientDb,
       yellowDb,
       redDb,
+      currentZone,
       isActive,
       dtSec,
     });

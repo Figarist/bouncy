@@ -358,20 +358,33 @@ class GameApp {
     this.renderer.setLightRoom(Boolean(isLight));
   }
 
-  calibrateMic() {
+  async calibrateMic() {
+    if (!this.mic.isListening) {
+      const ok = await this.mic.start(this.state.settings.micDeviceId);
+      this.panel.setMicButtonState(ok);
+      if (!ok) {
+        this.hud.showMicBlockedHelp();
+        return;
+      }
+    }
     this.zones.reset();
     this.mic.startCalibration(CONFIG.calibrationMs);
     this.wasCalibrating = this.mic.isCalibrating;
     this.panel.setCalibrateButtonState(this.mic.isCalibrating);
   }
 
-  openSetupWizard() {
+  async openSetupWizard() {
     if (this.setupWizard) {
       this.setupWizard.close();
     }
     this.setupWizard = new SetupWizard({
       mic: this.mic,
       currentSensitivity: this.state.settings.sensitivity,
+      onEnsureMic: async () => {
+        const ok = await this.mic.start(this.state.settings.micDeviceId);
+        this.panel.setMicButtonState(ok);
+        return ok;
+      },
       onSensitivityChange: (val) => {
         this.state.settings.sensitivity = val;
         this.panel.setSensitivityValue(val);
@@ -389,10 +402,9 @@ class GameApp {
         this.state.settings.setupDone = true;
         this.saveState();
         this.setupWizard = null;
-        this.calibrateMic();
       },
     });
-    this.setupWizard.open();
+    await this.setupWizard.open();
   }
 
   awardStarWithFlight() {
@@ -471,11 +483,7 @@ class GameApp {
     if (ok) {
       const devices = await this.mic.listDevices();
       this.panel.populateAudioDevices(devices, this.mic.deviceId);
-      if (!this.state.settings.setupDone) {
-        this.openSetupWizard();
-      } else {
-        this.calibrateMic();
-      }
+      // No automatic calibration on startup: keeps saved baseline intact so noisy classroom arrivals don't pollute it.
     } else {
       this.hud.showMicBlockedHelp();
     }
@@ -703,25 +711,6 @@ class GameApp {
       this.state.settings.sensitivity
     );
 
-    // Live update setup wizard if open
-    if (this.setupWizard?.isOpen) {
-      this.setupWizard.update(sample, evalResult, dt);
-    }
-
-    // Live VU meter in Teacher Panel
-    const isSignalActive = this.mic.isListening || this.simulatedDb !== null;
-    this.panel.updateMicLiveMeter(
-      sample.rawDb,
-      sample.db,
-      sample.ambientDb,
-      evalResult.yellowDb,
-      evalResult.redDb,
-      isSignalActive,
-      sample.isHot,
-      sample.processing,
-      dt
-    );
-
     // 3. Zone State Machine Update
     if (isBusyEngine) {
       this.zones.reset();
@@ -733,8 +722,27 @@ class GameApp {
       evalResult.redDb,
       zoneDtMs
     );
-
     const currentZone = isBusyEngine ? 'green' : zoneState.zone;
+
+    // Live update setup wizard if open
+    if (this.setupWizard?.isOpen) {
+      this.setupWizard.update(sample, evalResult, currentZone, dt);
+    }
+
+    // Live VU meter in Teacher Panel (synchronized with currentZone)
+    const isSignalActive = this.mic.isListening || this.simulatedDb !== null;
+    this.panel.updateMicLiveMeter(
+      sample.rawDb,
+      sample.db,
+      sample.ambientDb,
+      evalResult.yellowDb,
+      evalResult.redDb,
+      currentZone,
+      isSignalActive,
+      sample.isHot,
+      sample.processing,
+      dt
+    );
     const activeClassData = this.state.classes[this.state.activeClass];
 
     // Track quiet time statistics for active class when mic is active

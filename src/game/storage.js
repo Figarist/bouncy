@@ -154,7 +154,7 @@ function normalizeSettings(rawSettings) {
   out.balls = clamp(Math.round(out.balls), 10, 150);
   out.volume = clamp(out.volume, 0, 1);
   out.alertRepeatSec = clamp(out.alertRepeatSec, 0, 60);
-  out.sensitivity = clamp(Math.round(out.sensitivity), -15, 15);
+  out.sensitivity = clamp(Math.round(out.sensitivity), -25, 25);
   if (out.ambientBaselineDb <= -72 || out.ambientBaselineDb > -15) {
     out.ambientBaselineDb = -55;
   }

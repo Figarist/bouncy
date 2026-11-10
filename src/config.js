@@ -4,7 +4,7 @@ export const CONFIG = {
     blockMs: 100,
     calibrationMs: 3000,
     wizardSilenceMs: 4000,
-    voiceCheckMs: 5000,
+    voiceCheckMs: 4000,
     calibrationPercentile: 0.20,
     noisySpreadDb: 10,
     thresholdFloorDb: -70,
@@ -13,6 +13,8 @@ export const CONFIG = {
     newNoiseSec: 60,
     smoothingAttack: 0.04,
     smoothingRelease: 0.35,
+    minYellowMarginDb: 2.0, // Yellow threshold is never closer to ambient than 2.0 dB
+    minRedMarginDb: 3.0,    // Red threshold is never closer to yellow than 3.0 dB
   },
   calibrationMs: 3000,
   minBaselineDb: -75,
