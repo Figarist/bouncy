@@ -87,7 +87,16 @@ describe('normalizeState', () => {
     expect(s.settings.balls).toBe(40);
     expect(s.settings.mode).toBe('quiet');
     expect(s.settings.volume).toBe(1);
+    expect(s.settings.setupDone).toBe(false);
     expect(s.settings).not.toHaveProperty('evil');
+  });
+
+  it('resets corrupted ratchet baseline back to -55 dB', () => {
+    const s = normalizeState({
+      classes: { A: createClassRecord() },
+      settings: { ambientBaselineDb: -75 },
+    });
+    expect(s.settings.ambientBaselineDb).toBe(-55);
   });
 
   it('returns null without classes', () => {

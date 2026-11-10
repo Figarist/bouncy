@@ -1,14 +1,26 @@
 export const CONFIG = {
-  // Meter & calibration
+  // Meter, silence & calibration engine
+  level: {
+    blockMs: 100,
+    calibrationMs: 3000,
+    wizardSilenceMs: 4000,
+    voiceCheckMs: 5000,
+    calibrationPercentile: 0.20,
+    noisySpreadDb: 10,
+    thresholdFloorDb: -70,
+    hotFloorDb: -25,
+    newNoiseDb: 6,
+    newNoiseSec: 60,
+    smoothingAttack: 0.04,
+    smoothingRelease: 0.35,
+  },
   calibrationMs: 3000,
-  calibrationPercentile: 0.25, // 25th percentile ignores spikes and accurately captures ambient room floor
-  minBaselineDb: -75,          // Baseline minimum limit
-  maxBaselineDb: -44,          // Never allow baseline above -44 dB (prevents app from becoming deaf)
+  minBaselineDb: -75,
   smoothing: {
     attack: 0.04,  // Fast rise (~40ms) so sudden speech & noise spikes are caught immediately
     release: 0.35, // Smooth release prevents visual flickering while staying responsive
   },
-  sfxMicMuteMs: 750,     // Ignore microphone when game sfx is playing to prevent TV speaker loop
+  sfxMicMuteMs: 1200,    // Ignore microphone for 1200ms when game sfx plays to prevent TV speaker loop
   alertCooldownMs: 1200, // Minimum gap on initial red-zone entry
   defaultAlertRepeatSec: 4, // Repeat interval while class stays in Red Zone (0 = play once)
 
@@ -50,34 +62,6 @@ export const CONFIG = {
     enterRedMs: 250,     // Fast response to speech/shouts (~250ms), rejects single click
     exitRedMs: 1000,
     hysteresisDb: 2.0,   // 2 dB hysteresis prevents rapid zone oscillation
-  },
-
-  // Mic Profiles for hardware adaptation (Webcam, Laptop, Studio/Headset)
-  micProfiles: {
-    webcam: {
-      id: 'webcam',
-      name: 'Веб-камера (відстань 2-4м)',
-      gain: 2.2, // Digital boost for quiet distant webcam mic
-      highpassHz: 120, // Filter out PC fans, AC hum and table bumps
-      presenceHz: 2200, // Boost speech presence
-      presenceGain: 3.5,
-    },
-    laptop: {
-      id: 'laptop',
-      name: 'Ноутбук / Вбудований',
-      gain: 1.5,
-      highpassHz: 100,
-      presenceHz: 2000,
-      presenceGain: 2.0,
-    },
-    close: {
-      id: 'close',
-      name: 'Близький / Гарнітура',
-      gain: 1.0,
-      highpassHz: 80,
-      presenceHz: 2000,
-      presenceGain: 0,
-    },
   },
 
   // Stars & rewards

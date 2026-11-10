@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { rmsDb, smooth, calibrate, evaluateLevel } from '../src/audio/meter.js';
+import {
+  rmsDb,
+  smooth,
+  calibrate,
+  evaluateLevel,
+  suggestSensitivity,
+  sensitivityVerdict,
+} from '../src/audio/meter.js';
 
 describe('Audio Meter pure functions', () => {
   it('calculates rmsDb for silence and full scale wave', () => {
@@ -40,8 +47,19 @@ describe('Audio Meter pure functions', () => {
     // If room had non-stop loud chatter during calibration:
     const noisySamples = [-35, -32, -30, -28, -25];
     const baseline = calibrate(noisySamples, 0.25, -75, -44);
-    // Clamped to -44 dB max
+    // Clamped to -44 dB max when specified
     expect(baseline).toBe(-44);
+  });
+
+  it('evaluates complete silence as 0 progress on the meter', () => {
+    const ambient = -55;
+    const yellowOffset = 4.5;
+    const redOffset = 9.0;
+
+    // At exact ambient silence or below ambient, progress must be 0
+    expect(evaluateLevel(-55, ambient, yellowOffset, redOffset).progress).toBe(0);
+    expect(evaluateLevel(-65, ambient, yellowOffset, redOffset).progress).toBe(0);
+    expect(evaluateLevel(-54, ambient, yellowOffset, redOffset).progress).toBe(0); // within 1.5 dB deadband
   });
 
   it('evaluates zones correctly based on ambient + offsets', () => {
@@ -62,5 +80,40 @@ describe('Audio Meter pure functions', () => {
     // With sensitivity = +5, yellow becomes -55.5 dB, red becomes -51.0 dB
     const res = evaluateLevel(-52, ambient, yellowOffset, redOffset, 5);
     expect(res.rawZone).toBe('yellow');
+  });
+
+  it('suggestSensitivity computes appropriate sensitivity for close and far setups', () => {
+    // 1. Distant laptop mic: quiet voice (delta 10 dB) -> needs higher sensitivity (+4)
+    const far = suggestSensitivity(-60, -50);
+    expect(far).toBeGreaterThanOrEqual(3);
+
+    // 2. Very close headset: loud voice (delta 35 dB) -> needs lower sensitivity (-10)
+    const close = suggestSensitivity(-65, -30);
+    expect(close).toBeLessThanOrEqual(-8);
+
+    // 3. Clamped between -15 and +15
+    expect(suggestSensitivity(-80, 0)).toBeGreaterThanOrEqual(-15);
+    expect(suggestSensitivity(-50, -50)).toBeLessThanOrEqual(15);
+  });
+
+  it('sensitivityVerdict returns proper guidance in Ukrainian', () => {
+    // Too loud (in red)
+    const vRed = sensitivityVerdict({ currentDb: -40, ambientDb: -55, yellowDb: -50, redDb: -45 });
+    expect(vRed.status).toBe('too-loud');
+    expect(vRed.text).toContain('Занадто чутливо');
+
+    // Idle quiet
+    const vQuiet = sensitivityVerdict({ currentDb: -55, ambientDb: -55, yellowDb: -50, redDb: -45 });
+    expect(vQuiet.status).toBe('idle');
+
+    // Good active response
+    const vGood = sensitivityVerdict({
+      currentDb: -55,
+      ambientDb: -55,
+      yellowDb: -50,
+      redDb: -45,
+      recentMaxZone: 'red',
+    });
+    expect(vGood.status).toBe('good');
   });
 });
