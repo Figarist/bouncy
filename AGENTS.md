@@ -55,7 +55,7 @@ for a new deploy every 30 minutes and when they become visible.
 ```
 src/main.js              GameApp: owns state, wires every module, runs the rAF loop
 src/config.js            Mode thresholds, mic profiles, zone timings, star timing, physics constants
-src/audio/               mic.js (Web Audio DSP chain + calibration), meter.js (dB → zone progress), sfx.js (synth)
+src/audio/               mic.js (Web Audio DSP chain + AGC/HW inspection), level-engine.js (NoiseLevelEngine), meter.js (dB → zone progress, sensitivity suggestion), sfx.js (synth)
 src/game/zones.js        Green/yellow/red state machine with debounce + hysteresis
 src/game/stars.js        StarManager: star progress per zone, golden combo, manual stars
 src/game/session.js      Lesson mode + task timer (start / toggle / cancel)
@@ -88,7 +88,7 @@ src/styles/main.css      imports friendly-arcade/tokens.css, app aliases, HUD, s
     ballScale,                     // 0.2 .. 2.0 (step 0.1), default 1.0
     sidebarPos,                    // { x, y } in px or null for default CSS placement
     alertSound, alertRepeatSec, volume, lightRoom,
-    ambientBaselineDb, micDeviceId, micProfile, micGain,
+    ambientBaselineDb, micDeviceId, setupDone,
     sidebarCollapsed, sidebarSort,
   },
 }

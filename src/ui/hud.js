@@ -212,6 +212,7 @@ export class HUD {
     this.alertBanner = this.container.querySelector('#alert-banner');
     this.alertText = this.container.querySelector('#alert-text');
     this.goldenBanner = this.container.querySelector('#golden-banner');
+    this.calQuickBtn = this.container.querySelector('#cal-quick-btn');
     this.micBlockedToast = this.container.querySelector('#mic-blocked-toast');
     this.goalModal = this.container.querySelector('#goal-modal');
     this.goalModalReward = this.container.querySelector('#goal-modal-reward');
@@ -308,16 +309,20 @@ export class HUD {
     });
   }
 
-  updateNoiseMeter(zone, progress, isCalibrating, calProgress) {
+  updateNoiseMeter(zone, progress, isCalibrating, calProgress, newNoiseHint = false) {
     this.dotGreen.classList.toggle('active', zone === 'green');
     this.dotYellow.classList.toggle('active', zone === 'yellow');
     this.dotRed.classList.toggle('active', zone === 'red');
+
+    if (this.calQuickBtn) {
+      this.calQuickBtn.classList.toggle('pulse-hint', Boolean(newNoiseHint));
+    }
 
     const pct = isCalibrating
       ? Math.round(calProgress * 100)
       : Math.min(100, Math.round((progress / 1.5) * 100));
 
-    const labelText = isCalibrating ? 'Слухаю…' : ZONE_LABELS[zone] || ZONE_LABELS.green;
+    const labelText = isCalibrating ? 'Слухаю тишу…' : ZONE_LABELS[zone] || ZONE_LABELS.green;
     if (labelText !== this.lastTrafficText) {
       this.lastTrafficText = labelText;
       this.trafficLabel.textContent = labelText;
@@ -339,7 +344,7 @@ export class HUD {
     } else if (zone === 'yellow') {
       subtext = 'Тихше, будь ласка!';
       subtextMode = 'warn';
-    } else if (pct >= 28) {
+    } else if (progress >= 0.35) {
       // Early warning while still technically in the green zone
       subtext = 'Шум зростає…';
       subtextMode = 'rising';
@@ -361,7 +366,7 @@ export class HUD {
       this.dbBar.className = 'db-bar zone-red';
     } else if (zone === 'yellow') {
       this.dbBar.className = 'db-bar zone-yellow';
-    } else if (pct >= 28) {
+    } else if (progress >= 0.35) {
       this.dbBar.className = 'db-bar zone-rising';
     } else {
       this.dbBar.className = 'db-bar zone-green';
