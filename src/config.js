@@ -24,7 +24,7 @@ export const CONFIG = {
   },
   sfxMicMuteMs: 1200,    // Ignore microphone for 1200ms when game sfx plays to prevent TV speaker loop
   alertCooldownMs: 1200, // Minimum gap on initial red-zone entry
-  defaultAlertRepeatSec: 4, // Repeat interval while class stays in Red Zone (0 = play once)
+  defaultAlertRepeatSec: 8, // Repeat interval while class stays in Red Zone (0 = play once)
 
   // Lesson modes and zone threshold offsets relative to ambient background noise (dB)
   modes: {

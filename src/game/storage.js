@@ -1,3 +1,12 @@
+import {
+  bufferToBase64,
+  base64ToBuffer,
+} from '../audio/sound-process.js';
+import {
+  getAllCustomSounds,
+  putCustomSoundRecord,
+} from '../audio/sound-library.js';
+
 const STORAGE_KEY = 'tyhyi-klas:v1';
 const SNAPSHOTS_KEY = 'tyhyi-klas:snapshots';
 export const MAX_SNAPSHOTS = 5;
@@ -7,6 +16,19 @@ export const CLASS_COLORS = ['#3B82F6', '#F97316', '#22C55E', '#A855F7', '#EC489
 
 /** Allowed "seconds of silence per star" values; bigger = slower, for older kids. */
 export const STAR_SPEEDS = [30, 60, 90];
+
+export const BUILTIN_SOUNDS = [
+  { id: 'shush', title: 'Тшшш' },
+  { id: 'chime', title: 'Кришталь' },
+  { id: 'musicbox', title: 'Скринька' },
+  { id: 'owl', title: 'Сова' },
+  { id: 'drop', title: 'Крапля' },
+  { id: 'breath', title: 'Вдих-видих' },
+  { id: 'beep', title: 'Радар' },
+  { id: 'bell', title: 'Дзвоник' },
+  { id: 'arcade', title: 'Аркада' },
+  { id: 'none', title: 'Без звуку' },
+];
 
 export const MAX_CLASS_NAME_LENGTH = 14;
 export const MAX_PRIZE_HISTORY = 30;
@@ -24,6 +46,7 @@ export function createClassRecord(overrides = {}) {
     goalsReached: 0,
     quietSeconds: 0,
     prizeHistory: [],
+    alertSound: '',
     ...overrides,
   };
 }
@@ -95,6 +118,48 @@ export function renameClassRecord(classes, oldName, newName) {
   return next;
 }
 
+/**
+ * Resolves which alert sound to play:
+ * 1. Class-specific sound (if defined and valid)
+ * 2. General settings alert sound (if valid)
+ * 3. Default fallback: 'shush'
+ *
+ * If the sound is a custom sound, validCustomIds set/array must contain it;
+ * otherwise it transparently falls back.
+ *
+ * @param {object} state
+ * @param {Iterable<string>} [validCustomIds]
+ * @returns {string} Sound ID to play
+ */
+export function resolveAlertSound(state, validCustomIds = null) {
+  if (!state) return 'shush';
+  const customSet = validCustomIds ? new Set(validCustomIds) : null;
+
+  const isAvailable = (id) => {
+    if (!id || id === 'none') return true;
+    if (BUILTIN_SOUNDS.some((b) => b.id === id)) return true;
+    if (id.startsWith('custom:')) {
+      return customSet ? customSet.has(id) : true;
+    }
+    return false;
+  };
+
+  const activeClassName = state.activeClass;
+  const activeClass = state.classes && state.classes[activeClassName];
+  const classSound = activeClass?.alertSound;
+
+  if (classSound && isAvailable(classSound)) {
+    return classSound;
+  }
+
+  const globalSound = state.settings?.alertSound;
+  if (globalSound && isAvailable(globalSound)) {
+    return globalSound;
+  }
+
+  return 'shush';
+}
+
 const DEFAULT_STATE = {
   activeClass: '4-Б',
   classOrder: ['4-Б', '3-А'],
@@ -120,7 +185,7 @@ const DEFAULT_STATE = {
     ballScale: 1.0,        // 0.2 .. 2.0 (step 0.1)
     sidebarPos: null,      // { x, y } in px or null for default css placement
     alertSound: 'shush',
-    alertRepeatSec: 4,
+    alertRepeatSec: 8,
     volume: 0.85,
     lightRoom: false,
     lang: 'uk',
@@ -154,6 +219,7 @@ function normalizeSettings(rawSettings) {
   out.balls = clamp(Math.round(out.balls), 10, 150);
   out.volume = clamp(out.volume, 0, 1);
   out.alertRepeatSec = clamp(out.alertRepeatSec, 0, 60);
+  out.alertSound = normalizeSoundId(out.alertSound) || 'shush';
   out.sensitivity = clamp(Math.round(out.sensitivity), -25, 25);
   if (out.ambientBaselineDb <= -72 || out.ambientBaselineDb > -15) {
     out.ambientBaselineDb = -55;
@@ -163,6 +229,16 @@ function normalizeSettings(rawSettings) {
       ? { x: Math.round(s.sidebarPos.x), y: Math.round(s.sidebarPos.y) }
       : null;
   return out;
+}
+
+function normalizeSoundId(v) {
+  if (typeof v !== 'string') return '';
+  const clean = v.trim();
+  if (!clean) return '';
+  if (BUILTIN_SOUNDS.some((b) => b.id === clean)) return clean;
+  // Custom sounds follow custom:<alphanumeric/hyphen> pattern
+  if (/^custom:[a-z0-9_-]{3,32}$/i.test(clean)) return clean;
+  return '';
 }
 
 function normalizeClassRecord(v, index) {
@@ -185,6 +261,7 @@ function normalizeClassRecord(v, index) {
           .map((p) => ({ reward: p.reward, date: p.date }))
           .slice(0, MAX_PRIZE_HISTORY)
       : [],
+    alertSound: normalizeSoundId(r.alertSound),
   });
 }
 
@@ -292,14 +369,36 @@ export class StorageManager {
   // Backup File Export & Import (JSON file for teachers to save on flash drive)
   // ---------------------------------------------------------------------------
 
-  static exportBackup(state) {
+  static exportBackup(state, customSounds = []) {
+    const formattedCustom = Array.isArray(customSounds)
+      ? customSounds
+          .map((r) => ({
+            id: r.id,
+            name: r.name,
+            addedAt: r.addedAt,
+            wavBase64: r.wav ? bufferToBase64(r.wav) : (r.wavBase64 || ''),
+          }))
+          .filter((s) => s.wavBase64)
+      : [];
+
     return {
       appName: 'tyhyi-klas',
-      version: '1.0',
+      version: '1.1',
       exportedAt: new Date().toISOString(),
       classesCount: Object.keys(state.classes || {}).length,
+      customSoundsCount: formattedCustom.length,
+      customSounds: formattedCustom,
       state: JSON.parse(JSON.stringify(state)),
     };
+  }
+
+  static async exportBackupWithSounds(state) {
+    try {
+      const records = await getAllCustomSounds();
+      return this.exportBackup(state, records);
+    } catch {
+      return this.exportBackup(state, []);
+    }
   }
 
   static importBackup(jsonString) {
@@ -308,6 +407,33 @@ export class StorageManager {
       const nextState = normalizeState(parsed?.state || parsed);
       if (!nextState) {
         return { success: false, error: 'Файл не містить дійсних даних класів «Тихого класу»' };
+      }
+
+      // Restore custom sounds asynchronously if present
+      if (Array.isArray(parsed?.customSounds) && parsed.customSounds.length > 0) {
+        setTimeout(async () => {
+          for (const item of parsed.customSounds) {
+            try {
+              if (
+                item &&
+                typeof item.id === 'string' &&
+                /^custom:[a-z0-9_-]{3,32}$/i.test(item.id) &&
+                typeof item.wavBase64 === 'string' &&
+                item.wavBase64.length > 44
+              ) {
+                const buffer = base64ToBuffer(item.wavBase64);
+                await putCustomSoundRecord({
+                  id: item.id,
+                  name: item.name || 'Свій звук',
+                  addedAt: item.addedAt,
+                  wav: buffer,
+                });
+              }
+            } catch {
+              // Ignore broken sound record
+            }
+          }
+        }, 0);
       }
 
       // Take safety backup of current state first; refuse to import if it couldn't be stored

@@ -19,10 +19,13 @@ import {
   iconUpload,
   iconCheck,
   iconReset,
+  iconTrash,
+  iconPlay,
   getThemeCardIllustration,
 } from './icons.js';
 import { openPopover, getOpenPopover, closePopover, escapeHtml } from './popover.js';
-import { StorageManager } from '../game/storage.js';
+import { StorageManager, BUILTIN_SOUNDS } from '../game/storage.js';
+import { listCustomSounds } from '../audio/sound-library.js';
 import { SensitivityMeter } from './sensitivity-meter.js';
 
 const THEMES = [
@@ -41,13 +44,7 @@ const THEMES = [
   { id: 'eyes', title: 'Очі', sub: 'Курсор' },
 ];
 
-const SOUNDS = [
-  { id: 'shush', title: 'Тссс!' },
-  { id: 'beep', title: 'Радар' },
-  { id: 'bell', title: 'Дзвоник' },
-  { id: 'arcade', title: 'Аркада' },
-  { id: 'none', title: 'Без звуку' },
-];
+const SOUNDS = BUILTIN_SOUNDS;
 
 const REPEATS = [
   { sec: 2, title: 'Кожні 2 с' },
@@ -255,10 +252,17 @@ export class TeacherPanel {
 
   soundSummary() {
     const s = this.state.settings;
-    const sound = SOUNDS.find((x) => x.id === s.alertSound) || SOUNDS[0];
-    if (sound.id === 'none') return sound.title;
-    const repeat = REPEATS.find((r) => r.sec === (s.alertRepeatSec ?? 4)) || REPEATS[1];
-    return `${sound.title} · ${repeat.title.toLowerCase()} · ${Math.round(s.volume * 100)}%`;
+    let soundTitle = 'Тшшш';
+    if (s.alertSound && s.alertSound.startsWith('custom:')) {
+      const match = this.customSoundsList?.find((x) => x.id === s.alertSound);
+      soundTitle = match ? match.name : 'Свій звук';
+    } else {
+      const sound = SOUNDS.find((x) => x.id === s.alertSound) || SOUNDS[0];
+      soundTitle = sound.title;
+      if (sound.id === 'none') return sound.title;
+    }
+    const repeat = REPEATS.find((r) => r.sec === (s.alertRepeatSec ?? 8)) || REPEATS[2];
+    return `${soundTitle} · ${repeat.title.toLowerCase()} · ${Math.round(s.volume * 100)}%`;
   }
 
   bindEvents() {
@@ -426,8 +430,8 @@ export class TeacherPanel {
         const btnExport = el.querySelector('#btn-export-backup');
         const fileImport = el.querySelector('#file-import-backup');
 
-        btnExport?.addEventListener('click', () => {
-          const data = StorageManager.exportBackup(this.state);
+        btnExport?.addEventListener('click', async () => {
+          const data = await StorageManager.exportBackupWithSounds(this.state);
           const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
@@ -476,22 +480,62 @@ export class TeacherPanel {
     });
   }
 
-  openSoundPopover(anchor) {
+  async openSoundPopover(anchor) {
     const s = this.state.settings;
-    const repeatSec = s.alertRepeatSec ?? 4;
+    const repeatSec = s.alertRepeatSec ?? 8;
+    this.customSoundsList = await listCustomSounds();
+    const customList = this.customSoundsList;
+
     openPopover({
       anchor,
       side: 'left',
       title: 'Сигнал, коли шумно',
       html: `
-        <span class="field-label">Звук (натисніть, щоб почути)</span>
+        <span class="field-label">Вбудовані звуки (натисніть, щоб почути)</span>
         <div class="choice-grid" id="sound-control">
           ${SOUNDS.map((x) => `
-            <button class="choice-btn ${s.alertSound === x.id ? 'active' : ''}" data-sound="${x.id}">${x.title}</button>
+            <button class="choice-btn ${s.alertSound === x.id ? 'active' : ''}" data-sound="${x.id}">${escapeHtml(x.title)}</button>
           `).join('')}
         </div>
 
-        <span class="field-label">Повторювати, поки шумно</span>
+        <div class="custom-sounds-section">
+          <div class="custom-sounds-header">
+            <span class="field-label">Мої звуки (${customList.length}/12)</span>
+            <label class="action-btn secondary upload-label" id="lbl-upload-sound">
+              ${iconUpload()}
+              <span>Додати звук</span>
+              <input type="file" id="file-custom-sound" accept="audio/*" style="display:none">
+            </label>
+          </div>
+
+          <div class="custom-sounds-list" id="custom-sounds-list">
+            ${
+              customList.length === 0
+                ? `<div class="custom-empty-notice">Немає власних звуків. Завантажте MP3 чи WAV файл (до 5 с).</div>`
+                : customList
+                    .map(
+                      (cs) => `
+              <div class="custom-sound-item ${s.alertSound === cs.id ? 'active' : ''}" data-custom-id="${cs.id}">
+                <button class="choice-btn custom-pick-btn ${s.alertSound === cs.id ? 'active' : ''}" data-sound="${cs.id}">
+                  ${escapeHtml(cs.name)}
+                </button>
+                <div class="custom-item-actions">
+                  <button class="icon-btn-inline preview-custom" title="Прослухати" data-preview-id="${cs.id}">
+                    ${iconPlay()}
+                  </button>
+                  <button class="icon-btn-inline danger delete-custom" title="Видалити" data-delete-id="${cs.id}">
+                    ${iconTrash()}
+                  </button>
+                </div>
+              </div>
+            `
+                    )
+                    .join('')
+            }
+          </div>
+        </div>
+
+        <span class="field-label" style="margin-top:12px;">Повторювати, поки шумно</span>
         <div class="liquid-glass-pillbar panel-pillbar" id="repeat-control">
           ${REPEATS.map((r) => `
             <button class="liquid-glass-tab ${repeatSec === r.sec ? 'active' : ''}" data-repeat="${r.sec}">${r.title}</button>
@@ -502,17 +546,61 @@ export class TeacherPanel {
           <span class="field-label">Гучність</span>
           <span class="slider-val" id="val-volume">${Math.round(s.volume * 100)}%</span>
         </div>
-        <input type="range" class="slider" id="slider-volume" min="0" max="1.2" step="0.05" value="${s.volume}">
-        <button class="action-btn secondary full-width" id="btn-preview-sound">${iconVolume()} <span>Прослухати</span></button>
+        <input type="range" class="slider" id="slider-volume" min="0" max="1" step="0.05" value="${s.volume}">
+        <button class="action-btn secondary full-width" id="btn-preview-sound">${iconVolume()} <span>Прослухати обраний звук</span></button>
       `,
       onMount: (el) => {
-        el.querySelectorAll('[data-sound]').forEach((btn) => {
-          btn.addEventListener('click', () => {
-            el.querySelectorAll('[data-sound]').forEach((b) => b.classList.toggle('active', b === btn));
-            this.callbacks.onSound(btn.dataset.sound, true);
-            this.refreshSummaries();
+        const bindSoundButtons = () => {
+          el.querySelectorAll('[data-sound]').forEach((btn) => {
+            btn.onclick = () => {
+              el.querySelectorAll('[data-sound]').forEach((b) => b.classList.toggle('active', b === btn));
+              el.querySelectorAll('.custom-sound-item').forEach((item) => {
+                item.classList.toggle('active', item.dataset.customId === btn.dataset.sound);
+              });
+              this.callbacks.onSound(btn.dataset.sound, true);
+              this.refreshSummaries();
+            };
+          });
+        };
+        bindSoundButtons();
+
+        // Custom sound preview
+        el.querySelectorAll('.preview-custom').forEach((btn) => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.callbacks.onSound(btn.dataset.previewId, true);
           });
         });
+
+        // Custom sound delete
+        el.querySelectorAll('.delete-custom').forEach((btn) => {
+          btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const id = btn.dataset.deleteId;
+            if (this.callbacks.onDeleteCustomSound) {
+              await this.callbacks.onDeleteCustomSound(id);
+              this.openSoundPopover(anchor);
+            }
+          });
+        });
+
+        // Custom sound file upload
+        const fileInput = el.querySelector('#file-custom-sound');
+        if (fileInput) {
+          fileInput.addEventListener('change', async (e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            if (this.callbacks.onAddCustomSound) {
+              const res = await this.callbacks.onAddCustomSound(file);
+              if (res?.error) {
+                alert(res.error);
+              } else {
+                this.openSoundPopover(anchor);
+              }
+            }
+          });
+        }
+
         el.querySelectorAll('[data-repeat]').forEach((btn) => {
           btn.addEventListener('click', () => {
             el.querySelectorAll('[data-repeat]').forEach((b) => b.classList.toggle('active', b === btn));
@@ -520,6 +608,7 @@ export class TeacherPanel {
             this.refreshSummaries();
           });
         });
+
         const sVol = el.querySelector('#slider-volume');
         const vVol = el.querySelector('#val-volume');
         sVol.addEventListener('input', () => {
