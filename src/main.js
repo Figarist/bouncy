@@ -33,6 +33,12 @@ import { SetupWizard } from './ui/setup-wizard.js';
 import { IntroOverlay } from './ui/intro.js';
 import { iconLab } from './ui/icons.js';
 import { initServiceWorker } from './ui/update-notice.js';
+import { TabIndicator } from './ui/tab-indicator.js';
+import {
+  BackgroundWatchdog,
+  BackgroundTicker,
+  clampSimulationDt,
+} from './game/bg-watchdog.js';
 
 class GameApp {
   constructor() {
@@ -108,6 +114,8 @@ class GameApp {
 
     // State
     this.lastFrameTime = performance.now();
+    this.lastTimerWallTime = this.lastFrameTime;
+    this.lastWorkerStepTime = this.lastFrameTime;
     this.lastAlertTime = 0;
     this.quietStatSaveTimer = 0;
     this.isPaused = false;
@@ -116,6 +124,17 @@ class GameApp {
     this.pointerTarget = { x: null, y: null };
     this.displayedStars = classData.stars;
     this.hasCelebratedGoal = classData.stars >= classData.goal;
+    this.latestTickState = null;
+
+    // Background execution: real-time AudioWorklet + Web Worker fallback/watchdog + tab indicator
+    this.tabIndicator = new TabIndicator();
+    this.watchdog = new BackgroundWatchdog(CONFIG.background);
+    this.bgTicker = new BackgroundTicker(CONFIG.background.workerTickMs, () => {
+      this.onBackgroundWorkerTick();
+    });
+    this.mic.onAudioBlock = (rawDb, dtMs) => {
+      this.onMicAudioBlock(rawDb, dtMs);
+    };
 
     // Debug Simulator (?debug)
     this.simulatedDb = null;
@@ -126,6 +145,7 @@ class GameApp {
     this.initResize();
     this.initHotkeys();
     this.initCursorHide();
+    this.initVisibilityHandling();
 
     // Start with Intro
     new IntroOverlay(() => {
@@ -477,13 +497,13 @@ class GameApp {
     await this.setupWizard.open();
   }
 
-  awardStarWithFlight() {
-    this.stars.awardManualStar();
-    const cData = this.state.classes[this.state.activeClass];
-    if (cData) {
-      cData.totalStars = (cData.totalStars || 0) + 1;
+  deliverStarFeedback() {
+    if (document.hidden) {
+      this.displayedStars = this.stars.stars;
+      sfx.playChime();
+      this.checkGoalReached();
+      return;
     }
-    this.saveClassStars();
 
     const jarCoords = this.hud.getJarMouthCoords();
     this.renderer.particles.spawnFlyingStar(
@@ -498,6 +518,16 @@ class GameApp {
         this.checkGoalReached();
       }
     );
+  }
+
+  awardStarWithFlight() {
+    this.stars.awardManualStar();
+    const cData = this.state.classes[this.state.activeClass];
+    if (cData) {
+      cData.totalStars = (cData.totalStars || 0) + 1;
+    }
+    this.saveClassStars();
+    this.deliverStarFeedback();
   }
 
   resetCurrentStars() {
@@ -528,7 +558,9 @@ class GameApp {
         this.sidebar.update();
       }
       sfx.playFanfare();
-      this.renderer.particles.spawnConfetti(this.renderer.width, this.renderer.height);
+      if (!document.hidden) {
+        this.renderer.particles.spawnConfetti(this.renderer.width, this.renderer.height);
+      }
       this.hud.showGoalReachedModal(cData?.reward || '5 хв мультика', () => {
         this.resetCurrentStars();
       });
@@ -565,12 +597,6 @@ class GameApp {
   // so it is taken again on every return to the tab while the lesson runs.
   async requestWakeLock() {
     if (!('wakeLock' in navigator)) return;
-    if (!this.onWakeLockVisibility) {
-      this.onWakeLockVisibility = () => {
-        if (document.visibilityState === 'visible' && !this.wakeLock) this.requestWakeLock();
-      };
-      document.addEventListener('visibilitychange', this.onWakeLockVisibility);
-    }
     if (this.wakeLock || document.visibilityState !== 'visible') return;
     try {
       this.wakeLock = await navigator.wakeLock.request('screen');
@@ -579,6 +605,46 @@ class GameApp {
       });
     } catch {
       // Unsupported, battery saver or no user activation yet: the next visibility change retries
+    }
+  }
+
+  initVisibilityHandling() {
+    document.addEventListener('visibilitychange', () => {
+      this.onVisibilityChange();
+    });
+  }
+
+  async onVisibilityChange() {
+    const now = performance.now();
+    if (document.hidden) {
+      this.lastWorkerStepTime = now;
+      this.watchdog.enterBackground(now);
+      this.bgTicker.start();
+      this.updateTabIndicator();
+      return;
+    }
+
+    this.bgTicker.stop();
+    this.tabIndicator.reset();
+    this.lastFrameTime = now;
+    this.mic.lastUpdateTime = now;
+
+    if (!this.wakeLock) {
+      this.requestWakeLock();
+    }
+    await this.mic.resumeContextIfNeeded();
+    if (sfx.ctx?.state === 'suspended') {
+      sfx.ensureContext();
+    }
+
+    if (this.latestTickState) {
+      this.syncBackgroundTimerOnly(now);
+      this.syncHudFromState(this.latestTickState);
+    }
+    this.sidebar.update();
+
+    if (this.watchdog.consumeFrozenWarning() && this.mic.isListening) {
+      this.hud.showBackgroundAudioPausedToast();
     }
   }
 
@@ -638,6 +704,14 @@ class GameApp {
     new HotkeyManager({
       onSpace: () => {
         this.isPaused = !this.isPaused;
+        const now = performance.now();
+        this.lastTimerWallTime = now;
+        if (!this.isPaused) {
+          this.mic.lastUpdateTime = now;
+        }
+        if (document.hidden) {
+          this.updateTabIndicator();
+        }
       },
       onM: async () => {
         await this.toggleMicrophone();
@@ -737,6 +811,254 @@ class GameApp {
     StorageManager.save(this.state);
   }
 
+  isMicWorkletFeeding() {
+    return Boolean(this.mic.isListening && this.mic.isWorkletActive && this.simulatedDb === null);
+  }
+
+  onMicAudioBlock(rawDb, dtMs) {
+    const now = performance.now();
+    this.watchdog.recordWorkletActivity(now);
+    if (this.isPaused || this.simulatedDb !== null) return;
+    const sample = this.mic.processBlock(rawDb, dtMs);
+    this.processSimulationStep({ sample, dtSec: dtMs / 1000, now });
+  }
+
+  onBackgroundWorkerTick() {
+    if (!document.hidden) return;
+    const now = performance.now();
+    const hb = this.watchdog.evaluateHeartbeat({
+      now,
+      isListening: this.mic.isListening,
+      isWorkletActive: this.mic.isWorkletActive,
+      isSimulated: this.simulatedDb !== null,
+      audioContextState: this.mic.audioContext?.state || 'running',
+    });
+
+    if (hb.shouldAttemptResume) {
+      this.watchdog.markResumeAttempt(now);
+      this.mic.resumeContextIfNeeded();
+    }
+
+    if (this.isPaused) {
+      this.lastTimerWallTime = Math.max(this.lastTimerWallTime, now);
+      this.updateTabIndicator();
+      return;
+    }
+
+    if (hb.shouldDriveFallbackTick) {
+      const sample = this.mic.sample(this.simulatedDb);
+      const rawDtSec = this.lastWorkerStepTime ? (now - this.lastWorkerStepTime) / 1000 : 0.1;
+      this.lastWorkerStepTime = now;
+      this.processSimulationStep({ sample, dtSec: rawDtSec, now });
+    } else {
+      this.lastWorkerStepTime = now;
+      this.syncBackgroundTimerOnly(now);
+      this.updateTabIndicator();
+    }
+  }
+
+  updateTaskTimer(now, isBusyEngine, currentZone, modeConfig, activeClassData) {
+    const wallDtSec = Math.max(0, (now - this.lastTimerWallTime) / 1000);
+    this.lastTimerWallTime = Math.max(this.lastTimerWallTime, now);
+    const timerRes = this.session.update(isBusyEngine ? 0 : wallDtSec, currentZone);
+    if (timerRes.completed) {
+      if (activeClassData) {
+        activeClassData.tasksCompleted = (activeClassData.tasksCompleted || 0) + 1;
+        if (timerRes.cleanStreak) {
+          activeClassData.cleanTasks = (activeClassData.cleanTasks || 0) + 1;
+        }
+        this.saveState();
+        this.sidebar.update();
+      }
+      sfx.playFanfare();
+      if (!document.hidden) {
+        this.renderer.particles.spawnConfetti(this.renderer.width, this.renderer.height);
+      }
+      if (timerRes.cleanStreak && modeConfig.rewardsEnabled) {
+        this.awardStarWithFlight();
+      }
+    }
+    return timerRes;
+  }
+
+  syncBackgroundTimerOnly(now) {
+    const modeConfig = this.session.getModeConfig();
+    const activeClassData = this.state.classes[this.state.activeClass];
+    const snap = this.latestTickState;
+    const isBusy = snap ? snap.isBusyEngine : false;
+    const zone = snap ? snap.currentZone : 'green';
+    const timerRes = this.updateTaskTimer(now, isBusy, zone, modeConfig, activeClassData);
+    if (snap) {
+      snap.timerRes = timerRes;
+    }
+  }
+
+  updateTabIndicator() {
+    if (!document.hidden) return;
+    const snap = this.latestTickState;
+    this.tabIndicator.update({
+      zone: snap?.currentZone || 'green',
+      remainingSeconds: this.session.timerRemainingSeconds,
+      timerRunning: this.session.timerRunning,
+      isListening: this.mic.isListening,
+      isSimulated: this.simulatedDb !== null,
+      isPaused: this.isPaused,
+    });
+  }
+
+  syncHudFromState(snap) {
+    const activeClassData = this.state.classes[this.state.activeClass];
+    this.hud.updateNoiseMeter(
+      snap.currentZone,
+      snap.evalResult.progress,
+      snap.sample.isCalibrating,
+      snap.sample.calibrationProgress,
+      snap.sample.newNoiseHint
+    );
+    this.hud.updateStars(
+      this.displayedStars,
+      this.stars.goal,
+      snap.starRes.progress,
+      snap.starRes.isGolden,
+      activeClassData?.reward || '5 хв мультика'
+    );
+    this.hud.updateTimer(
+      snap.timerRes.remaining,
+      snap.timerRes.running,
+      this.session.timerTotalSeconds
+    );
+  }
+
+  /**
+   * Advances core audio evaluation, zone transitions, alerts, stars, and task timer.
+   * Runs both in foreground (rAF or AudioWorklet) and in background tabs.
+   */
+  processSimulationStep({ sample, dtSec, now }) {
+    const safeDtSec = clampSimulationDt(dtSec, CONFIG.background.maxStepDtSec);
+    const isBusyEngine = sample.isCalibrating || sample.isVoiceCheck;
+
+    if (sample.isCalibrating !== this.wasCalibrating) {
+      this.wasCalibrating = sample.isCalibrating;
+      this.panel.setCalibrateButtonState(sample.isCalibrating);
+      if (!sample.isCalibrating) {
+        this.zones.reset();
+        this.lastAlertTime = now + 1500;
+        this.saveState();
+      }
+    }
+
+    // Zone Evaluation
+    const modeConfig = this.session.getModeConfig();
+    const evalResult = evaluateLevel(
+      sample.db,
+      sample.ambientDb,
+      modeConfig.yellowOffsetDb,
+      modeConfig.redOffsetDb,
+      this.state.settings.sensitivity
+    );
+
+    // Zone State Machine Update
+    if (isBusyEngine) {
+      this.zones.reset();
+    }
+    const zoneDtMs = isBusyEngine || sample.frozen ? 0 : safeDtSec * 1000;
+    const zoneState = this.zones.update(
+      sample.db,
+      evalResult.yellowDb,
+      evalResult.redDb,
+      zoneDtMs
+    );
+    const currentZone = isBusyEngine ? 'green' : zoneState.zone;
+
+    // Live update setup wizard when visible so completion results are never missed between rAF frames
+    if (!document.hidden && this.setupWizard?.isOpen) {
+      this.setupWizard.update(sample, evalResult, currentZone, safeDtSec);
+    }
+
+    const isSignalActive = this.mic.isListening || this.simulatedDb !== null;
+    const activeClassData = this.state.classes[this.state.activeClass];
+
+    // Quiet time statistics
+    if (isSignalActive && currentZone === 'green' && activeClassData) {
+      activeClassData.quietSeconds = (activeClassData.quietSeconds || 0) + safeDtSec;
+      this.quietStatSaveTimer += safeDtSec;
+      if (this.quietStatSaveTimer >= 15) {
+        this.quietStatSaveTimer = 0;
+        this.saveState();
+        if (!document.hidden) {
+          this.sidebar.refreshEditor();
+        }
+      }
+    }
+
+    // One-shot Red Zone entry shock on visible screen
+    if (!document.hidden && !isBusyEngine && modeConfig.id !== 'breaktime' && currentZone === 'red' && zoneState.changed) {
+      this.physics.scareBounce(1.75);
+      this.hud.triggerScreenShake();
+      this.hud.triggerJarBounce();
+    }
+
+    // Alert Sound & Repeating Signal during sustained Red Zone noise (runs in background too)
+    if (currentZone === 'red' && !isBusyEngine && !sample.frozen) {
+      const repeatSec = this.state.settings.alertRepeatSec ?? CONFIG.defaultAlertRepeatSec;
+      const repeatMs = repeatSec > 0 ? repeatSec * 1000 : 0;
+      const shouldPlayInitial = zoneState.changed && (now - this.lastAlertTime > CONFIG.alertCooldownMs);
+      const shouldPlayRepeat = !zoneState.changed && repeatMs > 0 && (now - this.lastAlertTime >= repeatMs);
+
+      if (zoneState.changed) {
+        this.alertEscalationStep = 0;
+      }
+
+      if (shouldPlayInitial || shouldPlayRepeat) {
+        this.lastAlertTime = now;
+        if (!document.hidden) {
+          this.hud.showAlert();
+        }
+        // Escalation: 45% -> 65% -> 85% -> 100% max
+        const escalationLevel = Math.min(1.0, 0.45 + this.alertEscalationStep * 0.2);
+        this.alertEscalationStep++;
+
+        const alertSound = resolveAlertSound(this.state, this.customSoundIds);
+        sfx.playAlert(alertSound, escalationLevel);
+
+        if (shouldPlayRepeat && !document.hidden) {
+          this.physics.scareBounce(1.55);
+          this.hud.triggerScreenShake();
+        }
+      }
+    } else if (currentZone !== 'red') {
+      this.alertEscalationStep = 0;
+    }
+
+    // Star Rewards Update
+    const starRes = this.stars.update(currentZone, isBusyEngine ? 0 : safeDtSec, modeConfig.rewardsEnabled);
+    if (starRes.starAwarded) {
+      if (activeClassData) {
+        activeClassData.totalStars = (activeClassData.totalStars || 0) + 1;
+      }
+      this.saveClassStars();
+      this.deliverStarFeedback();
+    }
+
+    // Task Timer Update
+    const timerRes = this.updateTaskTimer(now, isBusyEngine, currentZone, modeConfig, activeClassData);
+
+    this.latestTickState = {
+      sample,
+      evalResult,
+      currentZone,
+      modeConfig,
+      isBusyEngine,
+      isSignalActive,
+      starRes,
+      timerRes,
+    };
+
+    if (document.hidden) {
+      this.updateTabIndicator();
+    }
+  }
+
   loop(now) {
     requestAnimationFrame(this.loop.bind(this));
 
@@ -755,52 +1077,24 @@ class GameApp {
       }
     }
 
-    if (this.isPaused) return;
-
-    // 1. Audio Sampling
-    const sample = this.mic.sample(this.simulatedDb);
-    const isBusyEngine = sample.isCalibrating || sample.isVoiceCheck;
-
-    if (sample.isCalibrating !== this.wasCalibrating) {
-      this.wasCalibrating = sample.isCalibrating;
-      this.panel.setCalibrateButtonState(sample.isCalibrating);
-      if (!sample.isCalibrating) {
-        this.zones.reset();
-        this.lastAlertTime = now + 1500;
-        this.saveState();
-      }
+    if (this.isPaused) {
+      this.lastTimerWallTime = Math.max(this.lastTimerWallTime, now);
+      return;
     }
 
-    // 2. Zone Evaluation
-    const modeConfig = this.session.getModeConfig();
-    const evalResult = evaluateLevel(
-      sample.db,
-      sample.ambientDb,
-      modeConfig.yellowOffsetDb,
-      modeConfig.redOffsetDb,
-      this.state.settings.sensitivity
-    );
-
-    // 3. Zone State Machine Update
-    if (isBusyEngine) {
-      this.zones.reset();
+    if (!this.isMicWorkletFeeding()) {
+      const sample = this.mic.sample(this.simulatedDb);
+      this.processSimulationStep({ sample, dtSec: dt, now });
+    } else {
+      this.syncBackgroundTimerOnly(now);
     }
-    const zoneDtMs = isBusyEngine || sample.frozen ? 0 : dt * 1000;
-    const zoneState = this.zones.update(
-      sample.db,
-      evalResult.yellowDb,
-      evalResult.redDb,
-      zoneDtMs
-    );
-    const currentZone = isBusyEngine ? 'green' : zoneState.zone;
 
-    // Live update setup wizard if open
-    if (this.setupWizard?.isOpen) {
-      this.setupWizard.update(sample, evalResult, currentZone, dt);
-    }
+    const snap = this.latestTickState;
+    if (!snap) return;
+
+    const { sample, evalResult, currentZone, modeConfig, isBusyEngine, isSignalActive, starRes } = snap;
 
     // Live VU meter in Teacher Panel (synchronized with currentZone)
-    const isSignalActive = this.mic.isListening || this.simulatedDb !== null;
     this.panel.updateMicLiveMeter(
       sample.rawDb,
       sample.db,
@@ -813,20 +1107,8 @@ class GameApp {
       sample.processing,
       dt
     );
-    const activeClassData = this.state.classes[this.state.activeClass];
 
-    // Track quiet time statistics for active class when mic is active
-    if (isSignalActive && currentZone === 'green' && activeClassData) {
-      activeClassData.quietSeconds = (activeClassData.quietSeconds || 0) + dt;
-      this.quietStatSaveTimer += dt;
-      if (this.quietStatSaveTimer >= 15) {
-        this.quietStatSaveTimer = 0;
-        this.saveState();
-        this.sidebar.refreshEditor();
-      }
-    }
-
-    // 4. Physical reaction to voice across modes (paused while calibrating)
+    // Continuous physical reaction to voice across modes (paused while calibrating)
     if (!isBusyEngine) {
       if (modeConfig.id === 'breaktime') {
         if (evalResult.progress > 0.2) {
@@ -843,98 +1125,22 @@ class GameApp {
         }
 
         if (currentZone === 'red') {
-          if (zoneState.changed) {
-            this.physics.scareBounce(1.75);
-            this.hud.triggerScreenShake();
-            this.hud.triggerJarBounce();
-          } else {
-            this.physics.chaosAgitate(Math.max(1.0, evalResult.progress * 1.35));
-          }
+          this.physics.chaosAgitate(Math.max(1.0, evalResult.progress * 1.35));
         }
       }
     }
 
-    // 4b. Alert Sound & Repeating Signal during sustained Red Zone noise
-    if (currentZone === 'red' && !isBusyEngine && !sample.frozen) {
-      const repeatSec = this.state.settings.alertRepeatSec ?? CONFIG.defaultAlertRepeatSec;
-      const repeatMs = repeatSec > 0 ? repeatSec * 1000 : 0;
-      const shouldPlayInitial = zoneState.changed && (now - this.lastAlertTime > CONFIG.alertCooldownMs);
-      const shouldPlayRepeat = !zoneState.changed && repeatMs > 0 && (now - this.lastAlertTime >= repeatMs);
-
-      if (zoneState.changed) {
-        this.alertEscalationStep = 0;
-      }
-
-      if (shouldPlayInitial || shouldPlayRepeat) {
-        this.lastAlertTime = now;
-        this.hud.showAlert();
-        // Escalation: 45% -> 65% -> 85% -> 100% max
-        const escalationLevel = Math.min(1.0, 0.45 + this.alertEscalationStep * 0.2);
-        this.alertEscalationStep++;
-
-        const alertSound = resolveAlertSound(this.state, this.customSoundIds);
-        sfx.playAlert(alertSound, escalationLevel);
-
-        if (shouldPlayRepeat) {
-          this.physics.scareBounce(1.55);
-          this.hud.triggerScreenShake();
-        }
-      }
-    } else if (currentZone !== 'red') {
-      this.alertEscalationStep = 0;
-    }
-
-    // 5. Star Rewards Update
-    const starRes = this.stars.update(currentZone, isBusyEngine ? 0 : dt, modeConfig.rewardsEnabled);
-    if (starRes.starAwarded) {
-      if (activeClassData) {
-        activeClassData.totalStars = (activeClassData.totalStars || 0) + 1;
-      }
-      const jarCoords = this.hud.getJarMouthCoords();
-      this.renderer.particles.spawnFlyingStar(
-        this.renderer.width * 0.5,
-        this.renderer.height * 0.45,
-        jarCoords.x,
-        jarCoords.y,
-        () => {
-          this.displayedStars = this.stars.stars;
-          sfx.playChime();
-          this.hud.triggerJarBounce();
-          this.checkGoalReached();
-        }
-      );
-      this.saveClassStars();
-    }
-
-    // 6. Task Timer Update (+1 task statistic on completion!)
-    const timerRes = this.session.update(isBusyEngine ? 0 : realDt, currentZone);
-    if (timerRes.completed) {
-      if (activeClassData) {
-        activeClassData.tasksCompleted = (activeClassData.tasksCompleted || 0) + 1;
-        if (timerRes.cleanStreak) {
-          activeClassData.cleanTasks = (activeClassData.cleanTasks || 0) + 1;
-        }
-        this.saveState();
-        this.sidebar.update();
-      }
-      sfx.playFanfare();
-      this.renderer.particles.spawnConfetti(this.renderer.width, this.renderer.height);
-      if (timerRes.cleanStreak && modeConfig.rewardsEnabled) {
-        this.awardStarWithFlight();
-      }
-    }
-
-    // 6.5 Dynamic UI Obstacles (Sidebar and sliding Settings Panel)
+    // Dynamic UI Obstacles (Sidebar and sliding Settings Panel)
     const sidebarObstacle = this.sidebar.getPhysicalRect();
     this.physics.setSidebarObstacle(sidebarObstacle);
 
     const rightWallObstacle = this.panel.getPhysicalWall();
     this.physics.setRightWallObstacle(rightWallObstacle);
 
-    // 7. Physics Simulation Step
+    // Physics Simulation Step
     this.physics.update(dt, currentZone, starRes.isGolden);
 
-    // 8. Canvas Render
+    // Canvas Render
     this.renderer.render(
       this.physics,
       currentZone,
@@ -944,22 +1150,8 @@ class GameApp {
       this.pointerTarget.y
     );
 
-    // 9. HUD Updates
-    this.hud.updateNoiseMeter(
-      currentZone,
-      evalResult.progress,
-      sample.isCalibrating,
-      sample.calibrationProgress,
-      sample.newNoiseHint
-    );
-    this.hud.updateStars(
-      this.displayedStars,
-      this.stars.goal,
-      starRes.progress,
-      starRes.isGolden,
-      activeClassData?.reward || '5 хв мультика'
-    );
-    this.hud.updateTimer(timerRes.remaining, timerRes.running, this.session.timerTotalSeconds);
+    // HUD Updates
+    this.syncHudFromState(snap);
   }
 }
 

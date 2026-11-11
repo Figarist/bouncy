@@ -2,6 +2,7 @@ export const CONFIG = {
   // Meter, silence & calibration engine
   level: {
     blockMs: 100,
+    workletBlockMs: 32,
     calibrationMs: 3000,
     wizardSilenceMs: 4000,
     voiceCheckMs: 4000,
@@ -86,5 +87,14 @@ export const CONFIG = {
     gravity: 0.46,
     restitution: 0.82, // Higher bounciness for lively visual response
     friction: 0.993,
+  },
+
+  // Background tab execution, watchdog & sleep recovery
+  background: {
+    workerTickMs: 100,
+    maxStepDtSec: 0.25,
+    audioFreezeDetectMs: 2500,
+    sleepGapMs: 2500,
+    resumeRetryCooldownMs: 3000,
   },
 };
