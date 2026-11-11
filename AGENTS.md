@@ -53,20 +53,22 @@ for a new deploy every 30 minutes and when they become visible.
 ## Architecture
 
 ```
-src/main.js              GameApp: owns state, wires every module, runs the rAF loop
-src/config.js            Mode thresholds, mic profiles, zone timings, star timing, physics constants
-src/audio/               mic.js (Web Audio DSP chain + AGC/HW inspection), level-engine.js (NoiseLevelEngine), meter.js (dB → zone progress, sensitivity suggestion), sfx.js (synth), sound-library.js (IndexedDB audio storage), sound-process.js (audio processing & WAV)
+src/main.js              GameApp: owns state, wires every module, runs the rAF loop & decoupled background ticks
+src/config.js            Mode thresholds, mic profiles, zone timings, star timing, background timing & watchdog, physics constants
+src/audio/               mic.js (Web Audio DSP chain, AudioWorklet continuous capture + shared context), mic-worklet.js (real-time RMS AudioWorkletProcessor), level-engine.js (NoiseLevelEngine), meter.js (dB → zone progress, sensitivity suggestion), sfx.js (synth), sound-library.js (IndexedDB audio storage), sound-process.js (audio processing & WAV)
 src/game/zones.js        Green/yellow/red state machine with debounce + hysteresis
 src/game/stars.js        StarManager: star progress per zone, golden combo, manual stars
 src/game/session.js      Lesson mode + task timer (start / toggle / cancel)
 src/game/storage.js      localStorage load/save, rolling snapshots, JSON backup import/export, pure class helpers
+src/game/bg-watchdog.js  BackgroundWatchdog (OS sleep vs browser audio freeze), BackgroundTicker (Worker wrapper), clampSimulationDt
 src/world/, src/render/  Verlet physics, particles, canvas renderer, 13 procedural themes (src/render/themes/)
-src/ui/hud.js            Top bar: traffic light + label, mode tabs, timer button/menu, big timer, star jar, gear
+src/ui/hud.js            Top bar: traffic light + label, mode tabs, timer button/menu, big timer, star jar, gear, bg-paused toast
+src/ui/tab-indicator.js  TabIndicator: dynamic background tab title and colored status dot favicon (no system emoji)
 src/ui/class-sidebar.js  Draggable physical class window: cards, leaderboard sort, medals, drag reorder, class editor
 src/ui/teacher-panel.js  Settings drawer: mic card, sensitivity, popovers (balls/scale, sound, backup, PWA install)
 src/ui/popover.js        openPopover / closePopover / getOpenPopover / escapeHtml — one popover at a time
 src/ui/icons.js          All SVG icons and theme preview illustrations
-src/styles/main.css      imports friendly-arcade/tokens.css, app aliases, HUD, sidebar, panel, popovers
+src/styles/main.css      imports friendly-arcade/tokens.css, app aliases, HUD, sidebar, panel, popovers, bg-paused toast
 ```
 
 ### State (`localStorage['tyhyi-klas:v1']`)
