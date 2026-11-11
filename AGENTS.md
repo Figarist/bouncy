@@ -55,7 +55,7 @@ for a new deploy every 30 minutes and when they become visible.
 ```
 src/main.js              GameApp: owns state, wires every module, runs the rAF loop
 src/config.js            Mode thresholds, mic profiles, zone timings, star timing, physics constants
-src/audio/               mic.js (Web Audio DSP chain + AGC/HW inspection), level-engine.js (NoiseLevelEngine), meter.js (dB → zone progress, sensitivity suggestion), sfx.js (synth)
+src/audio/               mic.js (Web Audio DSP chain + AGC/HW inspection), level-engine.js (NoiseLevelEngine), meter.js (dB → zone progress, sensitivity suggestion), sfx.js (synth), sound-library.js (IndexedDB audio storage), sound-process.js (audio processing & WAV)
 src/game/zones.js        Green/yellow/red state machine with debounce + hysteresis
 src/game/stars.js        StarManager: star progress per zone, golden combo, manual stars
 src/game/session.js      Lesson mode + task timer (start / toggle / cancel)
@@ -79,6 +79,7 @@ src/styles/main.css      imports friendly-arcade/tokens.css, app aliases, HUD, s
     '4-Б': {
       stars, goal, reward,         // current jar
       color, secondsPerStar,       // per-class look and difficulty (30 | 60 | 90)
+      alertSound,                  // per-class custom or built-in sound override ('' = use global settings)
       totalStars, tasksCompleted, cleanTasks, goalsReached, quietSeconds,
       prizeHistory: [{ reward, date /* ISO */ }],   // newest first, capped at 30
     },
@@ -105,8 +106,10 @@ Backup & resilience features in `storage.js` (unit-tested in `tests/storage.test
 - **Rolling snapshots (`localStorage['tyhyi-klas:snapshots']`)**: up to `MAX_SNAPSHOTS` (5) automatic restore points
   created via `StorageManager.takeSnapshot(state, label)` on class creation, deletion, star reset, goal completion,
   and before restoring or importing backups.
-- **JSON file export/import**: `StorageManager.exportBackup(state)` and `StorageManager.importBackup(jsonString)`
-  allow teachers to save and restore `.json` backups on a USB drive.
+- **JSON file export/import**: `StorageManager.exportBackupWithSounds(state)` and `StorageManager.importBackup(jsonString)`
+  allow teachers to save and restore `.json` backups on a USB drive (custom sound recordings are preserved in base64).
+- **Custom sound storage (`IndexedDB['tyhyi-klas-audio']`)**: audio files up to 12 items (trimmed to 5s mono 22kHz WAV)
+  cached in IndexedDB so the app remains fully functional even if downloads are deleted from the host filesystem.
 - **Persistent storage**: `StorageManager.requestPersistentStorage()` requests `navigator.storage.persist()` on startup.
 
 ### Physics & Dynamic Obstacles (`src/world/physics.js`, `src/world/ball.js`)
