@@ -12,7 +12,8 @@ import {
   iconMedal,
 } from './icons.js';
 import { openPopover, closePopover, getOpenPopover, escapeHtml } from './popover.js';
-import { MAX_CLASS_NAME_LENGTH, CLASS_COLORS, STAR_SPEEDS, rankClasses, classNames } from '../game/storage.js';
+import { MAX_CLASS_NAME_LENGTH, CLASS_COLORS, STAR_SPEEDS, BUILTIN_SOUNDS, rankClasses, classNames } from '../game/storage.js';
+import { listCustomSounds } from '../audio/sound-library.js';
 
 const HISTORY_PREVIEW = 5;
 
@@ -373,13 +374,26 @@ export class ClassSidebar {
   // Class editor popover
   // ---------------------------------------------------------------------------
 
-  openEditor() {
+  async openEditor() {
     const name = this.state.activeClass;
     const c = this.state.classes[name];
     const card = this.findCard(name);
     if (!c || !card) return;
     const canDelete = Object.keys(this.state.classes).length > 1;
     this.editingClass = name;
+
+    let customSounds = [];
+    try {
+      customSounds = await listCustomSounds();
+    } catch {
+      customSounds = [];
+    }
+
+    const soundOptions = [
+      { id: '', title: 'Загальний (із налаштувань)' },
+      ...BUILTIN_SOUNDS.map((s) => ({ id: s.id, title: s.title })),
+      ...customSounds.map((s) => ({ id: s.id, title: `★ ${s.name}` })),
+    ];
 
     openPopover({
       // Edits re-render the sidebar, so look the card up again instead of holding the old node
@@ -401,6 +415,26 @@ export class ClassSidebar {
             ${CLASS_COLORS.map((col) => `
               <button type="button" class="color-swatch ${c.color === col ? 'active' : ''}" data-color="${col}" style="--swatch:${col}" title="Обрати колір"></button>
             `).join('')}
+          </div>
+        </div>
+
+        <div class="field">
+          <span class="field-label">Окремий звук сигналу для цього класу</span>
+          <div class="field-row">
+            <select class="text-input field-grow" id="ce-sound">
+              ${soundOptions
+                .map(
+                  (opt) => `
+                <option value="${opt.id}" ${(c.alertSound || '') === opt.id ? 'selected' : ''}>
+                  ${escapeHtml(opt.title)}
+                </option>
+              `
+                )
+                .join('')}
+            </select>
+            <button type="button" class="action-btn secondary" id="ce-test-sound" title="Прослухати обраний сигнал">
+              Прослухати
+            </button>
           </div>
         </div>
 
@@ -507,6 +541,21 @@ export class ClassSidebar {
         this.render();
       });
     });
+
+    const selectSound = el.querySelector('#ce-sound');
+    if (selectSound) {
+      selectSound.addEventListener('change', () => {
+        this.callbacks.onClassSoundChange?.(name, selectSound.value);
+      });
+    }
+
+    const btnTestSound = el.querySelector('#ce-test-sound');
+    if (btnTestSound && selectSound) {
+      btnTestSound.addEventListener('click', () => {
+        const soundToTest = selectSound.value || this.state.settings.alertSound || 'shush';
+        this.callbacks.onPreviewSound?.(soundToTest);
+      });
+    }
 
     el.querySelectorAll('[data-speed]').forEach((btn) => {
       btn.addEventListener('click', () => {

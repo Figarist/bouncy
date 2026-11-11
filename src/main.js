@@ -14,8 +14,14 @@ import {
   classNames,
   nextClassColor,
   recordPrize,
+  resolveAlertSound,
   MAX_CLASS_NAME_LENGTH,
 } from './game/storage.js';
+import {
+  getAllCustomSounds,
+  addCustomSoundFile,
+  deleteCustomSound,
+} from './audio/sound-library.js';
 import { PhysicsWorld } from './world/physics.js';
 import { CanvasRenderer } from './render/renderer.js';
 import { HUD } from './ui/hud.js';
@@ -81,6 +87,9 @@ class GameApp {
 
     // Sound volume init
     sfx.setVolume(this.state.settings.volume);
+    this.alertEscalationStep = 0;
+    this.customSoundIds = new Set();
+    this.initCustomSounds();
 
     // Initial setup
     this.renderer.setTheme(this.state.settings.theme);
@@ -217,6 +226,17 @@ class GameApp {
         this.hud.updateStars(this.stars.stars, this.stars.goal, 0, false, reward);
       },
       onAddStar: () => this.awardStarWithFlight(),
+      onClassSoundChange: (className, soundId) => {
+        const cData = this.state.classes[className];
+        if (!cData) return;
+        cData.alertSound = soundId;
+        this.saveState();
+      },
+      onPreviewSound: (soundId) => {
+        if (soundId && soundId !== 'none') {
+          sfx.playAlert(soundId, 1.0);
+        }
+      },
       onAddTask: () => {
         const cData = this.state.classes[this.state.activeClass];
         if (!cData) return;
@@ -311,8 +331,31 @@ class GameApp {
         this.state.settings.alertSound = sound;
         this.saveState();
         if (preview && sound !== 'none') {
-          sfx.playAlert(sound);
+          sfx.playAlert(sound, 1.0);
         }
+      },
+      onAddCustomSound: async (file) => {
+        sfx.ensureContext();
+        const res = await addCustomSoundFile(file, sfx.ctx);
+        if (res?.id) {
+          await this.initCustomSounds();
+          this.state.settings.alertSound = res.id;
+          this.saveState();
+          sfx.playAlert(res.id, 1.0);
+        }
+        return res;
+      },
+      onDeleteCustomSound: async (soundId) => {
+        await deleteCustomSound(soundId);
+        await this.initCustomSounds();
+        if (this.state.settings.alertSound === soundId) {
+          this.state.settings.alertSound = 'shush';
+        }
+        // Also cleanup class sound references if deleted
+        Object.values(this.state.classes).forEach((c) => {
+          if (c.alertSound === soundId) c.alertSound = '';
+        });
+        this.saveState();
       },
       onRepeatChange: (sec) => {
         this.state.settings.alertRepeatSec = sec;
@@ -323,9 +366,9 @@ class GameApp {
         sfx.setVolume(vol);
         this.saveState();
         if (preview && vol > 0) {
-          const sound = this.state.settings.alertSound;
+          const sound = resolveAlertSound(this.state, this.customSoundIds);
           if (sound && sound !== 'none') {
-            sfx.playAlert(sound);
+            sfx.playAlert(sound, 1.0);
           } else {
             sfx.playChime();
           }
@@ -339,6 +382,33 @@ class GameApp {
         this.toggleFullscreen();
       },
     };
+  }
+
+  async initCustomSounds() {
+    try {
+      const records = await getAllCustomSounds();
+      this.customSoundIds = new Set((records || []).map((r) => r.id));
+      if (!records || records.length === 0) {
+        sfx.setCustomBuffers(new Map());
+        return;
+      }
+      sfx.ensureContext();
+      const map = new Map();
+      for (const rec of records) {
+        try {
+          if (rec.wav && sfx.ctx) {
+            const buf = await sfx.ctx.decodeAudioData(rec.wav.slice(0));
+            map.set(rec.id, buf);
+          }
+        } catch {
+          // Ignore un-decodable sound, shush fallback handles it
+        }
+      }
+      sfx.setCustomBuffers(map);
+    } catch {
+      this.customSoundIds = new Set();
+      sfx.setCustomBuffers(new Map());
+    }
   }
 
   switchMode(modeId) {
@@ -791,16 +861,27 @@ class GameApp {
       const shouldPlayInitial = zoneState.changed && (now - this.lastAlertTime > CONFIG.alertCooldownMs);
       const shouldPlayRepeat = !zoneState.changed && repeatMs > 0 && (now - this.lastAlertTime >= repeatMs);
 
+      if (zoneState.changed) {
+        this.alertEscalationStep = 0;
+      }
+
       if (shouldPlayInitial || shouldPlayRepeat) {
         this.lastAlertTime = now;
         this.hud.showAlert();
-        sfx.playAlert(this.state.settings.alertSound);
+        // Escalation: 45% -> 65% -> 85% -> 100% max
+        const escalationLevel = Math.min(1.0, 0.45 + this.alertEscalationStep * 0.2);
+        this.alertEscalationStep++;
+
+        const alertSound = resolveAlertSound(this.state, this.customSoundIds);
+        sfx.playAlert(alertSound, escalationLevel);
 
         if (shouldPlayRepeat) {
           this.physics.scareBounce(1.55);
           this.hud.triggerScreenShake();
         }
       }
+    } else if (currentZone !== 'red') {
+      this.alertEscalationStep = 0;
     }
 
     // 5. Star Rewards Update
