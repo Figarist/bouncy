@@ -2644,6 +2644,19 @@ body.light-room .big-timer-digits {
 @media (prefers-reduced-motion: reduce) {
   .update-toast { animation: none; }
 }
+.bg-paused-toast {
+  border-color: var(--yellow);
+}
+.bg-paused-toast-icon {
+  display: grid;
+  place-items: center;
+  color: var(--status-yellow);
+  flex-shrink: 0;
+}
+.bg-paused-toast-icon svg {
+  width: 22px;
+  height: 22px;
+}
 
 /* ==========================================================================
    Sensitivity Meter Widget (live zone bar & pedagogical verdict)

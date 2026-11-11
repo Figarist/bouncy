@@ -14,6 +14,7 @@ import {
   iconModeQuiet,
   iconModeGroups,
   iconModeBreak,
+  iconMic,
 } from './icons.js';
 import { openPopover, closePopover, escapeHtml } from './popover.js';
 
@@ -465,6 +466,27 @@ export class HUD {
 
   showMicBlockedHelp() {
     this.micBlockedToast.classList.remove('hidden');
+  }
+
+  /**
+   * Brief notice shown when returning to the tab if the browser/OS paused mic audio in the background.
+   */
+  showBackgroundAudioPausedToast() {
+    document.querySelector('.bg-paused-toast')?.remove();
+    const toast = document.createElement('div');
+    toast.className = 'update-toast bg-paused-toast';
+    toast.setAttribute('role', 'status');
+    toast.innerHTML = `
+      <span class="bg-paused-toast-icon">${iconMic(false)}</span>
+      <span class="update-toast-text"><strong>Фоновий запис призупинявся</strong> Цей браузер або режим економії заряду зупиняє мікрофон на згорнутій вкладці.</span>
+      <button class="update-toast-close" type="button" aria-label="Закрити">${iconClose()}</button>
+    `;
+    const timer = setTimeout(() => toast.remove(), 9000);
+    toast.querySelector('.update-toast-close')?.addEventListener('click', () => {
+      clearTimeout(timer);
+      toast.remove();
+    });
+    document.body.appendChild(toast);
   }
 
   getJarMouthCoords() {

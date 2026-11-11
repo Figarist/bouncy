@@ -2,6 +2,7 @@ import { rmsDb } from './meter.js';
 import { sfx } from './sfx.js';
 import { CONFIG } from '../config.js';
 import { NoiseLevelEngine } from './level-engine.js';
+import workletSource from './mic-worklet.js?raw';
 
 export class MicrophoneInput {
   constructor() {
@@ -12,8 +13,15 @@ export class MicrophoneInput {
     this.lowpassFilter = null;
     this.analyser = null;
     this.timeData = null;
+    this.workletNode = null;
+    this.silentGain = null;
 
     this.isListening = false;
+    this.isWorkletActive = false;
+    this.lastWorkletAt = 0;
+    this.onAudioBlock = null;
+    this._workletLoadedContexts = new WeakSet();
+
     this.deviceId = '';
     this.error = null;
     this.lastUpdateTime = 0;
@@ -67,9 +75,14 @@ export class MicrophoneInput {
     }
 
     try {
+      // Share a single AudioContext with sfx so an active MediaStream anchors alert playback in background tabs
       if (!this.audioContext) {
-        this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        sfx.init(this.audioContext);
+        if (sfx.ctx) {
+          this.audioContext = sfx.ctx;
+        } else {
+          this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          sfx.init(this.audioContext);
+        }
       }
       if (this.audioContext.state === 'suspended') {
         await this.audioContext.resume();
@@ -119,6 +132,7 @@ export class MicrophoneInput {
       if (track) {
         track.onended = () => {
           this.isListening = false;
+          this.isWorkletActive = false;
           this.error = 'MicrophoneDisconnected';
         };
 
@@ -132,24 +146,88 @@ export class MicrophoneInput {
         }
       }
 
-      // Build Web Audio DSP pipeline
-      this.setupAudioGraph();
+      // Build Web Audio DSP pipeline (and attach AudioWorklet for continuous background capture)
+      await this.setupAudioGraph();
 
       this.isListening = true;
       this.lastUpdateTime = performance.now();
+      this.lastWorkletAt = this.lastUpdateTime;
       return true;
     } catch (err) {
       this.isListening = false;
+      this.isWorkletActive = false;
       this.error = err.name || 'MicrophoneError';
       return false;
     }
   }
 
   /**
-   * Builds clean speech-band DSP processing graph:
-   * Source -> Highpass (150Hz, AC/fan cut) -> Lowpass (4kHz, speech band limit & mic hiss cut) -> Analyser
+   * Registers the self-contained AudioWorklet module once per AudioContext.
    */
-  setupAudioGraph() {
+  async ensureWorkletModule() {
+    if (!this.audioContext?.audioWorklet || this._workletLoadedContexts.has(this.audioContext)) {
+      return;
+    }
+    const blobUrl = URL.createObjectURL(new Blob([workletSource], { type: 'application/javascript' }));
+    try {
+      await this.audioContext.audioWorklet.addModule(blobUrl);
+      this._workletLoadedContexts.add(this.audioContext);
+    } finally {
+      URL.revokeObjectURL(blobUrl);
+    }
+  }
+
+  /**
+   * Disconnects and stops the active AudioWorkletNode and silent destination pull.
+   */
+  _teardownWorklet() {
+    if (this.workletNode) {
+      this.workletNode.port.onmessage = null;
+      try {
+        this.workletNode.port.postMessage({ type: 'stop' });
+      } catch {
+        // ignore
+      }
+      try {
+        this.workletNode.disconnect();
+      } catch {
+        // ignore
+      }
+      this.workletNode = null;
+    }
+    if (this.silentGain) {
+      try {
+        this.silentGain.disconnect();
+      } catch {
+        // ignore
+      }
+      this.silentGain = null;
+    }
+    this.isWorkletActive = false;
+  }
+
+  /**
+   * Attempts to wake up a browser-suspended AudioContext.
+   * @returns {Promise<boolean>} true if context is running
+   */
+  async resumeContextIfNeeded() {
+    if (!this.audioContext) return false;
+    if (this.audioContext.state === 'suspended') {
+      try {
+        await this.audioContext.resume();
+      } catch {
+        return false;
+      }
+    }
+    return this.audioContext.state === 'running';
+  }
+
+  /**
+   * Builds clean speech-band DSP processing graph:
+   * Source -> Highpass (150Hz) -> Lowpass (4kHz) -> AudioWorkletNode -> silentGain(0) -> destination
+   *                                                \-> AnalyserNode (fallback / inspection)
+   */
+  async setupAudioGraph() {
     if (!this.audioContext || !this.mediaStream) return;
 
     try {
@@ -160,6 +238,7 @@ export class MicrophoneInput {
     } catch {
       // ignore
     }
+    this._teardownWorklet();
 
     this.source = this.audioContext.createMediaStreamSource(this.mediaStream);
 
@@ -175,7 +254,7 @@ export class MicrophoneInput {
     this.lowpassFilter.frequency.setValueAtTime(4000, this.audioContext.currentTime);
     this.lowpassFilter.Q.setValueAtTime(0.7, this.audioContext.currentTime);
 
-    // 3. Analyser
+    // 3. Analyser (fallback when AudioWorklet is unavailable)
     this.analyser = this.audioContext.createAnalyser();
     this.analyser.fftSize = 1024;
     this.analyser.smoothingTimeConstant = 0.1;
@@ -185,7 +264,41 @@ export class MicrophoneInput {
     this.source.connect(this.highpassFilter);
     this.highpassFilter.connect(this.lowpassFilter);
     this.lowpassFilter.connect(this.analyser);
-    // Analyser is intentionally NOT connected to audioContext.destination
+
+    // 4. AudioWorkletNode + zero-gain destination pull keeps real-time DSP alive in background tabs
+    if (typeof AudioWorkletNode === 'function' && this.audioContext.audioWorklet) {
+      try {
+        await this.ensureWorkletModule();
+        if (!this.mediaStream || !this.lowpassFilter) return;
+
+        this.workletNode = new AudioWorkletNode(this.audioContext, 'noise-meter-processor', {
+          numberOfInputs: 1,
+          numberOfOutputs: 1,
+          channelCount: 1,
+          processorOptions: {
+            blockMs: CONFIG.level.workletBlockMs || 32,
+            sampleRate: this.audioContext.sampleRate,
+          },
+        });
+        this.silentGain = this.audioContext.createGain();
+        this.silentGain.gain.setValueAtTime(0, this.audioContext.currentTime);
+
+        this.workletNode.port.onmessage = (event) => {
+          const data = event?.data;
+          if (data?.type === 'rms' && this.isListening) {
+            this.lastWorkletAt = performance.now();
+            this.onAudioBlock?.(data.rawDb, data.dtMs);
+          }
+        };
+
+        this.lowpassFilter.connect(this.workletNode);
+        this.workletNode.connect(this.silentGain);
+        this.silentGain.connect(this.audioContext.destination);
+        this.isWorkletActive = true;
+      } catch {
+        this._teardownWorklet();
+      }
+    }
   }
 
   async switchDevice(deviceId) {
@@ -197,6 +310,7 @@ export class MicrophoneInput {
   }
 
   stop() {
+    this._teardownWorklet();
     if (this.mediaStream) {
       this.mediaStream.getTracks().forEach((t) => t.stop());
       this.mediaStream = null;
@@ -227,23 +341,22 @@ export class MicrophoneInput {
   }
 
   /**
-   * Called every frame in requestAnimationFrame.
+   * Feeds a pre-measured raw dBFS block (e.g. from AudioWorklet) into the engine.
+   * @param {number} rawDb
+   * @param {number} dtMs
+   * @returns {object} normalized sample snapshot
+   */
+  processBlock(rawDb, dtMs) {
+    this.lastUpdateTime = performance.now();
+    const isMuted = sfx.isMutingMic(CONFIG.sfxMicMuteMs);
+    const engineRes = this.engine.feed(rawDb, dtMs, isMuted);
+    return this._buildSampleResult(rawDb, engineRes);
+  }
+
+  /**
+   * Polls AnalyserNode (or debug simulation) when AudioWorklet blocks are not driving updates.
    * @param {number} [externalSimulatedDb=null] if debug slider is active
-   * @returns {{
-   *   rawDb: number,
-   *   db: number,
-   *   ambientDb: number,
-   *   rawFloorDb: number,
-   *   isCalibrating: boolean,
-   *   isVoiceCheck: boolean,
-   *   calibrationProgress: number,
-   *   engineState: string,
-   *   frozen: boolean,
-   *   result: object|null,
-   *   newNoiseHint: boolean,
-   *   isHot: boolean,
-   *   processing: object
-   * }}
+   * @returns {object}
    */
   sample(externalSimulatedDb = null) {
     const now = performance.now();
@@ -262,7 +375,10 @@ export class MicrophoneInput {
     }
 
     const engineRes = this.engine.feed(rawDb, dtMs, isMuted);
+    return this._buildSampleResult(rawDb, engineRes);
+  }
 
+  _buildSampleResult(rawDb, engineRes) {
     return {
       rawDb,
       db: engineRes.db,
