@@ -3,6 +3,10 @@
 > **Інтерактивний візуальний шумомір, менеджер навчальних груп та ігровий асистент контролю тиші для шкіл, уроків, смарт-дошок (TV) і проекторів.**
 > Повністю автономний PWA-додаток із процедурною графікою Canvas, інтерфейсом у стилі **[Friendly Arcade](https://github.com/Figarist/friendly-arcade)**, компресованим Web Audio синтезатором та стабілізованою Verlet-фізикою кульок і кубів.
 
+- **🌐 Живий вебдодаток (Live Web App):** [sivochka.com/bouncy/](https://sivochka.com/bouncy/)
+- **📖 Інженерний розбір та гайд у блозі:** [Тихий клас: шумомір для шкільних вебкамер і ТВ (UK)](https://sivochka.com/uk/blog/quiet-class-classroom-noise-meter/) · [English Guide (EN)](https://sivochka.com/blog/quiet-class-classroom-noise-meter/)
+- **👨‍🏫 Автор та 1-на-1 менторство:** [Ігор Сівочка — sivochka.com](https://sivochka.com/uk/) · [Індивідуальні заняття з програмування](https://sivochka.com/uk/tutoring/)
+
 ---
 
 > 📘 **Для вчителів:** [docs/TEACHER_GUIDE.md](docs/TEACHER_GUIDE.md) · 🤖 **Для розробників та ШІ-агентів:** [AGENTS.md](AGENTS.md) · 🚀 **Деплой:** [DEPLOY.md](DEPLOY.md)
@@ -217,4 +221,18 @@ npm run serve:test
 
 ---
 
-© 2026 Ігор Сівочка ([sivochka.com](https://sivochka.com))
+## 👨‍🏫 Автор та екосистема (`Ihor Sivochka / Figarist`)
+
+Створено **Ігорем Сівочкою (`Ihor Sivochka / Figarist`)** — учителем інформатики, сертифікованим розробником Unity та творцем освітніх вебінструментів.
+
+- 🌐 **Головний сайт і блог:** [sivochka.com](https://sivochka.com/uk/) · [Розбір архітектури «Тихого класу»](https://sivochka.com/uk/blog/quiet-class-classroom-noise-meter/)
+- 🎓 **Індивідуальне 1-на-1 менторство (Unity/C#, Python, Scratch, інформатика, 3D):** [sivochka.com/uk/tutoring/](https://sivochka.com/uk/tutoring/) · [English](https://sivochka.com/tutoring/)
+- 🎛️ **OGCruncher:** [sivochka.com/OGCruncher/](https://sivochka.com/OGCruncher/) ([Repo](https://github.com/Figarist/OGCruncher)) — браузерний 8-bit/16-bit біткрашер та оптимізатор звуку для ігор
+- ⚒️ **3D Кузня Чудес (`3D Club Studio`):** [sivochka.com/3d-club-studio/](https://sivochka.com/3d-club-studio/) ([Repo](https://github.com/Figarist/3d-club-studio)) — офлайн 3D-студія для шкільних гуртків і друку без підтримок
+- 🧱 **Каталог LEGO WeDo 2.0:** [sivochka.com/lego-catalog/](https://sivochka.com/lego-catalog/) ([Repo](https://github.com/Figarist/lego-catalog)) — 597 PDF-інструкцій робототехніки у 26 категоріях
+- 🎨 **Дизайн-система Friendly Arcade UI:** [Figarist/friendly-arcade](https://github.com/Figarist/friendly-arcade)
+- 📺 **YouTube:** [@proVR_ua](https://www.youtube.com/@proVR_ua) · 💬 **Telegram:** [@proVR_ua](https://t.me/proVR_ua) · 💻 **GitHub:** [@Figarist](https://github.com/Figarist)
+
+---
+
+© 2026 Ігор Сівочка ([sivochka.com](https://sivochka.com/))
