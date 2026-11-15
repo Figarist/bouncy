@@ -3081,3 +3081,16 @@ body.light-room .big-timer-digits {
   border-color: var(--status-yellow);
   color: var(--status-yellow);
 }
+
+/* Crawler & Assistive Tech Semantic Reference (rendered behind fullscreen #game-canvas) */
+.sr-seo-guide {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  padding: 24px;
+  pointer-events: none;
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.5;
+}
