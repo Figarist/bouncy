@@ -34,6 +34,7 @@ import { IntroOverlay } from './ui/intro.js';
 import { iconLab } from './ui/icons.js';
 import { initServiceWorker } from './ui/update-notice.js';
 import { TabIndicator } from './ui/tab-indicator.js';
+import { setLanguage, t } from './ui/i18n.js';
 import {
   BackgroundWatchdog,
   BackgroundTicker,
@@ -44,6 +45,16 @@ class GameApp {
   constructor() {
     this.canvas = document.getElementById('game-canvas');
     this.state = StorageManager.load();
+
+    const urlLang = new URLSearchParams(window.location.search).get('lang');
+    const activeLang = (urlLang === 'en' || urlLang === 'pl' || urlLang === 'uk')
+      ? urlLang
+      : (this.state.settings.lang || 'uk');
+    setLanguage(activeLang);
+    document.documentElement.lang = activeLang;
+    if (activeLang !== 'uk') {
+      document.title = `${t('appTitle')} — ${t('appSubtitle')}`;
+    }
 
     // Core engines
     this.physics = new PhysicsWorld();
