@@ -5,19 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>Тихий клас — Шумомір для уроку та таймер тиші | Ігор Сівочка</title>
     <meta name="description" content="Безкоштовний автономний шумомір для класу з Web Audio DSP-фільтрацією вебкамери, таймером завдань і банкою зірок для уроків у школі (НУШ) на ТВ і проекторі." />
-    <meta name="keywords" content="тихий клас, шумомір для класу, bouncy balls, контроль тиші на уроці, таймер для вчителя, НУШ інтерактивні вправи, classroom noise meter, Ігор Сівочка, sivochka" />
-    <meta name="author" content="Ігор Сівочка (Sivochka Ihor)" />
-    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <meta name="keywords" content="тихий клас, шумомір для класу, bouncy balls, контроль тиші на уроці, таймер для вчителя, НУШ інтерактивні вправи, classroom noise meter, Ігор Сівочка, sivochka, Figarist" />
+    <meta name="author" content="Ігор Сівочка (Ihor Sivochka)" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="google-site-verification" content="Whr2bJTggESM1pyCXLfqwodNQu6cNqk_XKdZ0ix2Tyk" />
     <meta name="theme-color" content="#0F122B" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="author" href="https://sivochka.com/" />
     <link rel="canonical" href="https://sivochka.com/bouncy/" />
     <meta property="og:title" content="Тихий клас — Шумомір для уроку та таймер тиші" />
     <meta property="og:description" content="Безкоштовний шумомір для класу з адаптивним DSP-фільтром вебкамери, таймером завдань і банкою зірок для вчителів." />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://sivochka.com/bouncy/" />
     <meta property="og:image" content="https://sivochka.com/assets/images/default-social-card.webp" />
-    <meta property="og:site_name" content="Figarist · Ігор Сівочка" />
+    <meta property="og:image:alt" content="Тихий клас — безкоштовний інтерактивний шумомір та таймер тиші для школи від Ігоря Сівочки" />
+    <meta property="og:site_name" content="Ігор Сівочка (Figarist) · sivochka.com" />
     <meta property="og:locale" content="uk_UA" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@figarist" />
@@ -25,6 +28,7 @@
     <meta name="twitter:title" content="Тихий клас — Шумомір для уроку та таймер тиші" />
     <meta name="twitter:description" content="Безкоштовний шумомір для класу з адаптивним DSP-фільтром вебкамери, таймером завдань і банкою зірок для вчителів." />
     <meta name="twitter:image" content="https://sivochka.com/assets/images/default-social-card.webp" />
+    <meta name="twitter:image:alt" content="Тихий клас — безкоштовний інтерактивний шумомір та таймер тиші для школи від Ігоря Сівочки" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" type="image/svg+xml" href="./icon.svg" />
     <link rel="apple-touch-icon" href="./icon-192.png" />
@@ -36,13 +40,21 @@
             "@type": "WebApplication",
             "@id": "https://sivochka.com/bouncy/#app",
             "name": "Тихий клас (Quiet Class)",
-            "alternateName": "Bouncy Classroom Noise Meter",
+            "alternateName": ["Bouncy Classroom Noise Meter", "Тихій клас шумомір"],
             "url": "https://sivochka.com/bouncy/",
-            "description": "Безкоштовний інтерактивний шумомір для класу з Web Audio DSP-фільтрацією віддалених вебкамер, таймером завдань та мотиваційною банкою зірок для смарт-дошок, ТВ і шкільних проекторів.",
+            "image": "https://sivochka.com/assets/images/default-social-card.webp",
+            "description": "Безкоштовний інтерактивний шумомір для класу з Web Audio DSP-фільтрацією віддалених вебкамер (2–4 м), таймером завдань та мотиваційною банкою зірок для смарт-дошок, ТВ і шкільних проекторів.",
             "applicationCategory": "EducationalApplication",
             "operatingSystem": "Web, Windows, macOS, Android, iOS, ChromeOS",
             "inLanguage": ["uk", "en"],
             "isAccessibleForFree": true,
+            "featureList": [
+              "Web Audio DSP-тракт: фільтр 120 Гц від гулу кулерів та проекторів, акцент мовлення 2.2 кГц та програмний preamp для вебкамер на відстані 2–4 м",
+              "Автокалібрування фону тиші та три режими уроку: «Тиха робота», «Робота в групах» і «Перерва / Класика»",
+              "13 процедурних візуальних тем та контрастний режим «Світла кімната» для яскравих проекторів і сонячних кабінетів",
+              "Банка зірок за кожні 30 секунд тиші, таймер завдань і менеджер розкладу класів",
+              "100% приватна локальна обробка мікрофона в пам'яті браузера та офлайн-робота (PWA Service Worker)"
+            ],
             "offers": {
               "@type": "Offer",
               "price": "0",
@@ -52,7 +64,13 @@
               "@type": "Person",
               "@id": "https://sivochka.com#person",
               "name": "Ігор Сівочка",
-              "alternateName": "Sivochka Ihor",
+              "alternateName": [
+                "Ihor Sivochka",
+                "Sivochka Ihor",
+                "Ігор Глібович Сівочка",
+                "Игорь Сивочка",
+                "Figarist"
+              ],
               "url": "https://sivochka.com/",
               "sameAs": [
                 "https://sivochka.com/tutoring/",
@@ -60,6 +78,15 @@
                 "https://www.youtube.com/@proVR_ua",
                 "https://t.me/proVR_ua"
               ]
+            },
+            "creator": {
+              "@id": "https://sivochka.com#person"
+            },
+            "isPartOf": {
+              "@type": "WebSite",
+              "@id": "https://sivochka.com#website",
+              "name": "Ігор Сівочка (Figarist) — sivochka.com",
+              "url": "https://sivochka.com/"
             }
           },
           {
@@ -69,7 +96,7 @@
               {
                 "@type": "ListItem",
                 "position": 1,
-                "name": "Figarist",
+                "name": "Figarist — sivochka.com",
                 "item": "https://sivochka.com/"
               },
               {
@@ -79,6 +106,52 @@
                 "item": "https://sivochka.com/bouncy/"
               }
             ]
+          },
+          {
+            "@type": "FAQPage",
+            "@id": "https://sivochka.com/bouncy/#faq",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "Чому «Тихий клас» точно реагує на шепіт навіть через вебкамеру біля ТВ чи проектора на відстані 2–4 м?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Вбудований Web Audio DSP-конвеєр відсікає низькочастотний гул кулерів ПК та проекторів нижче 120 Гц, підсилює зону мовлення біля 2.2 кГц, використовує програмне підсилення Preamp та калібрує тишу за нижнім процентилем, ігноруючи випадковий стукіт."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Чи записується або передається звук із шкільного мікрофона на сервер?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Ні. Аудіопотік аналізується виключно в реальному часі в оперативній пам'яті браузера і нікуди не записується та не відправляється. Це гарантує повну приватність дітей у класі."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Як працюють Банка зірок, таймер завдань і профілі різних класів?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "У режимах контролю тиші клас отримує одну золоту зірку за кожні 30 секунд перебування в зеленій зоні. Вчитель може перемикати збережені класи (наприклад, 3-А чи 4-Б), задавати ціль нагороди та запускати вбудований таймер самостійної роботи."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Чи можна встановити «Тихий клас» на шкільний комп'ютер і користуватися без інтернету?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Так. Додаток зібраний як Progressive Web App (PWA) із локальними шрифтами та Service Worker, тому після першого відкриття працює навіть у разі зникнення Wi-Fi у школі."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Хто розробив інструмент і які ще безкоштовні освітні сервіси є на sivochka.com?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Шумомір «Тихий клас» створив викладач інформатики та інді-розробник Ігор Сівочка (Figarist). На сайті sivochka.com також доступні «3D Кузня Чудес» для шкільного 3D-друку, каталог інструкцій LEGO WeDo 2.0, біткрашер OGCruncher та інформація про індивідуальні заняття."
+                }
+              }
+            ]
           }
         ]
       }
@@ -86,6 +159,38 @@
   </head>
   <body>
     <canvas id="game-canvas"></canvas>
+    <aside class="sr-seo-guide" id="faq" aria-label="Довідка та часті питання про шумомір Тихий клас">
+      <h2>Тихий клас — Довідка, Web Audio DSP та часті питання (FAQ)</h2>
+      <p><strong>Тихий клас (Quiet Class)</strong> — безкоштовний автономний шумомір для класу, таймер завдань і система мотивації класу для вчителів НУШ на інтерактивних дошках, телевізорах і проекторах. Розробник: Ігор Сівочка (Ihor Sivochka / Figarist).</p>
+      <details>
+        <summary tabindex="-1">Чому «Тихий клас» точно реагує на шепіт навіть через вебкамеру біля ТВ чи проектора на відстані 2–4 м?</summary>
+        <p>Вбудований Web Audio DSP-конвеєр відсікає низькочастотний гул кулерів ПК та проекторів нижче 120 Гц, підсилює зону мовлення біля 2.2 кГц, використовує програмне підсилення Preamp та калібрує тишу за нижнім процентилем, ігноруючи випадковий стукіт.</p>
+      </details>
+      <details>
+        <summary tabindex="-1">Чи записується або передається звук із шкільного мікрофона на сервер?</summary>
+        <p>Ні. Аудіопотік аналізується виключно в реальному часі в оперативній пам'яті браузера і нікуди не записується та не відправляється. Це гарантує повну приватність дітей у класі.</p>
+      </details>
+      <details>
+        <summary tabindex="-1">Як працюють Банка зірок, таймер завдань і профілі різних класів?</summary>
+        <p>У режимах контролю тиші клас отримує одну золоту зірку за кожні 30 секунд перебування в зеленій зоні. Вчитель може перемикати збережені класи (наприклад, 3-А чи 4-Б), задавати ціль нагороди та запускати вбудований таймер самостійної роботи.</p>
+      </details>
+      <details>
+        <summary tabindex="-1">Чи можна встановити «Тихий клас» на шкільний комп'ютер і користуватися без інтернету?</summary>
+        <p>Так. Додаток зібраний як Progressive Web App (PWA) із локальними шрифтами та Service Worker, тому після першого відкриття працює навіть у разі зникнення Wi-Fi у школі.</p>
+      </details>
+      <details>
+        <summary tabindex="-1">Хто розробив інструмент і які ще безкоштовні освітні сервіси є на sivochka.com?</summary>
+        <p>Шумомір «Тихий клас» створив викладач інформатики та інді-розробник Ігор Сівочка (Figarist). На сайті sivochka.com також доступні «3D Кузня Чудес» для шкільного 3D-друку, каталог інструкцій LEGO WeDo 2.0, біткрашер OGCruncher та інформація про індивідуальні заняття.</p>
+      </details>
+      <nav aria-label="Посилання екосистеми sivochka.com">
+        <a href="https://sivochka.com/" tabindex="-1">Портфоліо Ігоря Сівочки (Figarist)</a>
+        <a href="https://sivochka.com/uk/blog/quiet-class-classroom-noise-meter/" tabindex="-1">Технічна стаття про Web Audio DSP у Тихому класі</a>
+        <a href="https://sivochka.com/uk/tutoring/" tabindex="-1">Індивідуальні заняття з програмування та 3D</a>
+        <a href="https://sivochka.com/3d-club-studio/" tabindex="-1">3D Кузня Чудес (генератор STL без підтримок)</a>
+        <a href="https://sivochka.com/lego-catalog/" tabindex="-1">Каталог інструкцій LEGO WeDo 2.0</a>
+        <a href="https://sivochka.com/OGCruncher/" tabindex="-1">OGCruncher — біткрашер та оптимізатор звуку для ігор</a>
+      </nav>
+    </aside>
     <noscript>
       <main>
         <h1>Тихий клас — Інтерактивний шумомір для уроку та таймер тиші</h1>
