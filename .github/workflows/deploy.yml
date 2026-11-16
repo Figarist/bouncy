@@ -15,27 +15,41 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  build:
+    name: Test and build bundle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./dist
+
   deploy:
-    name: Test, build and deploy to sivochka.com/bouncy/
+    name: Deploy to sivochka.com/bouncy/
+    needs: build
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: npm
-
-      - run: npm ci
-      - run: npm test
-      - run: npm run build
-
-      - uses: actions/configure-pages@v6
-      - uses: actions/upload-pages-artifact@v5
-        with:
-          path: ./dist
       - id: deployment
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@v4
+
+  notify_failure:
+    name: Notify Telegram on failure
+    if: failure()
+    needs: [build, deploy]
+    uses: Figarist/figarist.github.io/.github/workflows/notify-telegram.yml@main
+    with:
+      title: "bouncy deploy failed on ${{ github.ref_name }}"
+      status: "error"
+      details: "Commit ${{ github.sha }}"
+    secrets: inherit
