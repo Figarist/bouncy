@@ -15,7 +15,7 @@
     "@fontsource/nunito": "^5.1.0",
     "@fontsource/rubik": "^5.1.0",
     "friendly-arcade": "github:Figarist/friendly-arcade#v2.1.0",
-    "vite": "^8.3.5",
+    "vite": "^8.3.8",
     "vitest": "^5.1.0"
   }
 }
