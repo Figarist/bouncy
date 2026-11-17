@@ -203,7 +203,7 @@ export class TeacherPanel {
 
         <div class="panel-footer">
           <p class="privacy-text">${iconLock()} <span>${t('privacyNote')}</span></p>
-          <p class="hotkeys-text">Автор: <a href="https://sivochka.com/" target="_blank" rel="noopener">Ігор Сівочка — уроки IT та 3D ↗</a></p>
+          <p class="hotkeys-text">Автор: <a href="https://sivochka.com/" target="_blank" rel="noopener">Ігор Сівочка (sivochka.com) ↗</a> · <a href="https://github.com/Figarist/bouncy" target="_blank" rel="noopener">GitHub ↗</a></p>
         </div>
       </div>
     `;
