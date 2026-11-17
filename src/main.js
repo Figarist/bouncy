@@ -52,6 +52,12 @@ class GameApp {
       : (this.state.settings.lang || 'uk');
     setLanguage(activeLang);
     document.documentElement.lang = activeLang;
+    // Keep canonical/og:url self-consistent with the sitemap for explicit ?lang= variants
+    if (urlLang === 'en' || urlLang === 'pl') {
+      const variant = `https://sivochka.com/bouncy/?lang=${urlLang}`;
+      document.querySelector('link[rel="canonical"]')?.setAttribute('href', variant);
+      document.querySelector('meta[property="og:url"]')?.setAttribute('content', variant);
+    }
     if (activeLang !== 'uk') {
       document.title = `${t('appTitle')} — ${t('appSubtitle')}`;
     }
