@@ -22,6 +22,49 @@ export function rmsDb(samples) {
 }
 
 /**
+ * Analyzes a time-domain buffer into RMS, Peak, Crest Factor, and health flags.
+ * Used as the AnalyserNode fallback when AudioWorklet is unavailable.
+ * @param {Float32Array|number[]} samples
+ * @returns {{
+ *   rawDb: number,
+ *   peakDb: number,
+ *   crestDb: number,
+ *   isZeroBlock: boolean,
+ *   isClipping: boolean
+ * }}
+ */
+export function analyzeTimeDomain(samples) {
+  if (!samples || samples.length === 0) {
+    return {
+      rawDb: -100,
+      peakDb: -100,
+      crestDb: 0,
+      isZeroBlock: true,
+      isClipping: false,
+    };
+  }
+  let sum = 0;
+  let maxAbs = 0;
+  for (let i = 0; i < samples.length; i++) {
+    const s = samples[i];
+    const abs = s < 0 ? -s : s;
+    if (abs > maxAbs) maxAbs = abs;
+    sum += s * s;
+  }
+  const rms = Math.sqrt(sum / samples.length);
+  const rawDb = 20 * Math.log10(Math.max(rms, 1e-5));
+  const peakDb = 20 * Math.log10(Math.max(maxAbs, 1e-5));
+  const crestDb = Math.max(0, peakDb - rawDb);
+  return {
+    rawDb,
+    peakDb,
+    crestDb,
+    isZeroBlock: maxAbs < 1e-6,
+    isClipping: maxAbs >= 0.98,
+  };
+}
+
+/**
  * Asymmetric smoothing with fast attack (rise) and slow release (fall).
  * Prevents rapid visual flickering while catching sudden sound spikes immediately.
  * @param {number} prev

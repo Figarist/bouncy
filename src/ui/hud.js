@@ -472,13 +472,25 @@ export class HUD {
    * Brief notice shown when returning to the tab if the browser/OS paused mic audio in the background.
    */
   showBackgroundAudioPausedToast() {
+    this.showMicStatusToast(
+      'Фоновий запис призупинявся',
+      'Цей браузер або режим економії заряду зупиняє мікрофон на згорнутій вкладці.'
+    );
+  }
+
+  /**
+   * Brief plain-Ukrainian notice for microphone disconnect/reconnect or background audio pause.
+   * @param {string} title
+   * @param {string} detail
+   */
+  showMicStatusToast(title, detail) {
     document.querySelector('.bg-paused-toast')?.remove();
     const toast = document.createElement('div');
     toast.className = 'update-toast bg-paused-toast';
     toast.setAttribute('role', 'status');
     toast.innerHTML = `
       <span class="bg-paused-toast-icon">${iconMic(false)}</span>
-      <span class="update-toast-text"><strong>Фоновий запис призупинявся</strong> Цей браузер або режим економії заряду зупиняє мікрофон на згорнутій вкладці.</span>
+      <span class="update-toast-text"><strong>${escapeHtml(title)}</strong> ${escapeHtml(detail)}</span>
       <button class="update-toast-close" type="button" aria-label="Закрити">${iconClose()}</button>
     `;
     const timer = setTimeout(() => toast.remove(), 9000);

@@ -149,8 +149,27 @@ class GameApp {
     this.bgTicker = new BackgroundTicker(CONFIG.background.workerTickMs, () => {
       this.onBackgroundWorkerTick();
     });
-    this.mic.onAudioBlock = (rawDb, dtMs) => {
-      this.onMicAudioBlock(rawDb, dtMs);
+    this.mic.onAudioBlock = (rawDb, dtMs, meta) => {
+      this.onMicAudioBlock(rawDb, dtMs, meta);
+    };
+    this.mic.onDevicesChanged = (devices) => {
+      this.panel.populateAudioDevices(devices, this.mic.deviceId);
+    };
+    this.mic.onStatusChange = ({ status, error }) => {
+      this.recordAudioDebugEvent('mic-status', { status, error });
+      if (status === 'disconnected') {
+        this.panel.setMicButtonState(false);
+        this.hud.showMicStatusToast(
+          'Мікрофон відключився',
+          'Спробую підключити інший пристрій автоматично або оберіть мікрофон у налаштуваннях.'
+        );
+      } else if (status === 'reconnected') {
+        this.panel.setMicButtonState(true);
+        this.hud.showMicStatusToast(
+          'Мікрофон знову працює',
+          'Зв’язок із пристроєм відновлено автоматично.'
+        );
+      }
     };
 
     // Debug Simulator (?debug)
@@ -769,48 +788,105 @@ class GameApp {
       const debugBar = document.createElement('div');
       debugBar.className = 'debug-bar';
       debugBar.innerHTML = `
-        <span>${iconLab()} СИМУЛЯТОР ШУМУ:</span>
+        <span>${iconLab()}</span>
+        <button id="sim-source-mic" class="debug-source-btn active" title="Використовувати реальний мікрофон">Мікрофон</button>
+        <button id="sim-source-sim" class="debug-source-btn" title="Використовувати повзунок симулятора">Симулятор</button>
         <input type="range" id="sim-slider" min="-80" max="-10" step="1" value="-60">
-        <span id="sim-val">-60 dB</span>
+        <span id="sim-val">LIVE</span>
         <button id="sim-zero-btn">Тиша</button>
         <button id="sim-stir-btn">Шепіт</button>
         <button id="sim-shout-btn">Крик!</button>
+        <span id="debug-dsp-readout" class="debug-dsp-readout"></span>
         <span id="fps-counter" style="margin-left: auto;">FPS: 60</span>
       `;
       document.body.appendChild(debugBar);
 
+      const micBtn = debugBar.querySelector('#sim-source-mic');
+      const simBtn = debugBar.querySelector('#sim-source-sim');
       const slider = debugBar.querySelector('#sim-slider');
       const valSpan = debugBar.querySelector('#sim-val');
       const zeroBtn = debugBar.querySelector('#sim-zero-btn');
       const stirBtn = debugBar.querySelector('#sim-stir-btn');
       const shoutBtn = debugBar.querySelector('#sim-shout-btn');
 
-      this.simulatedDb = -60;
+      const setLiveMicMode = async () => {
+        this.simulatedDb = null;
+        micBtn.classList.add('active');
+        simBtn.classList.remove('active');
+        slider.classList.add('is-inactive');
+        valSpan.textContent = 'LIVE';
+        this.zones.reset();
+        if (!this.mic.isListening) {
+          await this.toggleMicrophone();
+        }
+      };
 
-      slider.addEventListener('input', () => {
-        this.simulatedDb = parseFloat(slider.value);
-        valSpan.textContent = `${this.simulatedDb} dB`;
-      });
-      zeroBtn.addEventListener('click', () => {
-        slider.value = -70;
-        this.simulatedDb = -70;
-        valSpan.textContent = '-70 dB';
-      });
-      stirBtn.addEventListener('click', () => {
-        slider.value = -42;
-        this.simulatedDb = -42;
-        valSpan.textContent = '-42 dB';
-      });
-      shoutBtn.addEventListener('click', () => {
-        slider.value = -25;
-        this.simulatedDb = -25;
-        valSpan.textContent = '-25 dB';
-      });
+      const setSimulatorMode = (dbVal = null) => {
+        const nextDb = dbVal !== null ? dbVal : parseFloat(slider.value);
+        slider.value = nextDb;
+        this.simulatedDb = nextDb;
+        simBtn.classList.add('active');
+        micBtn.classList.remove('active');
+        slider.classList.remove('is-inactive');
+        valSpan.textContent = `${nextDb} dB`;
+      };
 
+      // Default to real microphone in ?debug so live mic testing works right away;
+      // moving the slider or pressing any preset switches seamlessly to simulator.
+      this.simulatedDb = null;
+      slider.classList.add('is-inactive');
+
+      micBtn.addEventListener('click', () => setLiveMicMode());
+      simBtn.addEventListener('click', () => setSimulatorMode());
+      slider.addEventListener('input', () => setSimulatorMode(parseFloat(slider.value)));
+      zeroBtn.addEventListener('click', () => setSimulatorMode(-70));
+      stirBtn.addEventListener('click', () => setSimulatorMode(-42));
+      shoutBtn.addEventListener('click', () => setSimulatorMode(-25));
+
+      this.debugDspEl = debugBar.querySelector('#debug-dsp-readout');
+      this.debugAudioEvents = [];
+      this._wasImpulseInDebug = false;
+      window.__bouncyAudio = {
+        events: this.debugAudioEvents,
+        snapshot: () => this.getAudioDebugSnapshot(),
+      };
       this.fpsEl = debugBar.querySelector('#fps-counter');
       this.frameCount = 0;
       this.fpsTimer = performance.now();
     }
+  }
+
+  recordAudioDebugEvent(type, payload = {}) {
+    if (!this.debugAudioEvents) return;
+    this.debugAudioEvents.push({
+      t: new Date().toISOString().slice(11, 23),
+      type,
+      ...payload,
+    });
+    if (this.debugAudioEvents.length > 50) {
+      this.debugAudioEvents.shift();
+    }
+  }
+
+  getAudioDebugSnapshot() {
+    const snap = this.latestTickState;
+    return {
+      source: this.simulatedDb !== null ? 'simulator' : this.mic.isWorkletActive ? 'worklet' : 'analyser',
+      isListening: this.mic.isListening,
+      audioContextState: this.mic.audioContext?.state || null,
+      processing: this.mic.processing,
+      mode: this.state.settings.mode,
+      sensitivity: this.state.settings.sensitivity,
+      zone: snap?.currentZone || this.zones.currentZone,
+      charges: {
+        yellowMs: Math.round(this.zones.yellowChargeMs),
+        redMs: Math.round(this.zones.redChargeMs),
+        exitMs: Math.round(this.zones.exitChargeMs),
+      },
+      sample: snap?.sample || null,
+      thresholds: snap?.evalResult ? { yellowDb: snap.evalResult.yellowDb, redDb: snap.evalResult.redDb } : null,
+      config: { level: CONFIG.level, zones: CONFIG.zones, sfxMicMuteMs: CONFIG.sfxMicMuteMs },
+    };
   }
 
   saveClassStars() {
@@ -832,11 +908,11 @@ class GameApp {
     return Boolean(this.mic.isListening && this.mic.isWorkletActive && this.simulatedDb === null);
   }
 
-  onMicAudioBlock(rawDb, dtMs) {
+  onMicAudioBlock(rawDb, dtMs, meta = null) {
     const now = performance.now();
     this.watchdog.recordWorkletActivity(now);
     if (this.isPaused || this.simulatedDb !== null) return;
-    const sample = this.mic.processBlock(rawDb, dtMs);
+    const sample = this.mic.processBlock(rawDb, dtMs, meta);
     this.processSimulationStep({ sample, dtSec: dtMs / 1000, now });
   }
 
@@ -974,18 +1050,40 @@ class GameApp {
       this.state.settings.sensitivity
     );
 
-    // Zone State Machine Update
+    // Zone State Machine Update (breaktime uses raw fast visual level; quiet/groups use anti-impulse detectorDb)
     if (isBusyEngine) {
       this.zones.reset();
     }
     const zoneDtMs = isBusyEngine || sample.frozen ? 0 : safeDtSec * 1000;
+    const detectorInputDb = modeConfig.id === 'breaktime' ? sample.db : (sample.detectorDb ?? sample.db);
     const zoneState = this.zones.update(
-      sample.db,
+      detectorInputDb,
       evalResult.yellowDb,
       evalResult.redDb,
       zoneDtMs
     );
     const currentZone = isBusyEngine ? 'green' : zoneState.zone;
+
+    if (this.debugAudioEvents) {
+      if (zoneState.changed) {
+        this.recordAudioDebugEvent('zone-change', {
+          from: zoneState.previousZone,
+          to: zoneState.zone,
+          rawDb: Math.round(sample.rawDb * 10) / 10,
+          detDb: Math.round(detectorInputDb * 10) / 10,
+          flrDb: Math.round(sample.ambientDb * 10) / 10,
+          crestDb: sample.crestDb != null ? Math.round(sample.crestDb * 10) / 10 : null,
+        });
+      }
+      if (sample.isImpulse && !this._wasImpulseInDebug) {
+        this.recordAudioDebugEvent('impulse-gated', {
+          rawDb: Math.round(sample.rawDb * 10) / 10,
+          detDb: Math.round(detectorInputDb * 10) / 10,
+          crestDb: sample.crestDb != null ? Math.round(sample.crestDb * 10) / 10 : null,
+        });
+      }
+      this._wasImpulseInDebug = Boolean(sample.isImpulse);
+    }
 
     // Live update setup wizard when visible so completion results are never missed between rAF frames
     if (!document.hidden && this.setupWizard?.isOpen) {
@@ -1111,6 +1209,20 @@ class GameApp {
 
     const { sample, evalResult, currentZone, modeConfig, isBusyEngine, isSignalActive, starRes } = snap;
 
+    if (this.debugDspEl) {
+      const rawStr = Math.round(sample.rawDb);
+      const detStr = Math.round(sample.detectorDb ?? sample.db);
+      const flrStr = Math.round(sample.ambientDb);
+      const crStr = sample.crestDb != null ? ` cr:${sample.crestDb.toFixed(1)}` : '';
+      const spStr = sample.speechDeltaDb != null ? ` sp-rm:${sample.speechDeltaDb >= 0 ? '+' : ''}${Math.round(sample.speechDeltaDb)}` : '';
+      const redCharge = Math.round(this.zones.redChargeMs);
+      const srcTag = this.simulatedDb !== null ? '[SIM]' : this.mic.isWorkletActive ? '[W]' : '[A]';
+      const impTag = sample.isImpulse ? ' [IMPULSE]' : '';
+      const sfxTag = sample.frozen ? ' [MUTE]' : '';
+      const muteTag = sample.isMutedHardware ? ' [NO-SIG]' : '';
+      this.debugDspEl.textContent = `raw:${rawStr} det:${detStr} flr:${flrStr}${crStr}${spStr} R:${redCharge}/${this.zones.enterRedMs} ${srcTag}${impTag}${sfxTag}${muteTag}`;
+    }
+
     // Live VU meter in Teacher Panel (synchronized with currentZone)
     this.panel.updateMicLiveMeter(
       sample.rawDb,
@@ -1122,7 +1234,11 @@ class GameApp {
       isSignalActive,
       sample.isHot,
       sample.processing,
-      dt
+      dt,
+      {
+        isMutedHardware: sample.isMutedHardware,
+        isClipping: sample.isClipping,
+      }
     );
 
     // Continuous physical reaction to voice across modes (paused while calibrating)

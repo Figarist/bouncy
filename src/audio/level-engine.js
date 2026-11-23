@@ -1,8 +1,13 @@
 import { smooth } from './meter.js';
 
 /**
- * Pure noise-level and ambient-floor engine.
+ * Pure noise-level, impulse-rejection, and ambient-floor engine.
  * Decoupled from Web Audio / DOM so it can be 100% unit tested.
+ *
+ * Dual-channel design:
+ * - `db` (`smoothedDb`): smooth visual level (fast attack, slow release) so HUD and balls feel alive.
+ * - `detectorDb`: anti-impulse, rumble-penalized, fast-release level for ZoneStateMachine so
+ *   dropped pencils, coughs, and desk knocks do not stretch into false Red Zone alerts.
  */
 export class NoiseLevelEngine {
   /**
@@ -20,13 +25,23 @@ export class NoiseLevelEngine {
       hotFloorDb: -25,
       newNoiseDb: 6,
       newNoiseSec: 60,
+      stationarySpreadDb: 7,
       smoothingAttack: 0.04,
       smoothingRelease: 0.35,
+      detectorAttack: 0.035,
+      detectorRelease: 0.085,
+      impulseCrestDb: 11.5,
+      impulseJumpDb: 12.0,
+      impulseMaxMs: 180,
+      rumbleMarginDb: 4.0,
+      rumblePenaltyDb: 6.0,
+      zeroSignalWarnMs: 2500,
       ...cfg,
     };
 
     this.floorDb = -55;
     this.smoothedDb = -80;
+    this.detectorDb = -80;
     this.state = 'idle'; // 'idle' | 'calibrating' | 'voice'
 
     // Calibration state
@@ -44,6 +59,35 @@ export class NoiseLevelEngine {
     this.minWindowSamples = [];
     this.persistentNoiseSec = 0;
     this.newNoiseHint = false;
+
+    // Impulse rejection & mute transition state
+    this.impulseHoldMs = 0;
+    this.impulseBaseDb = -80;
+    this.wasMuted = false;
+
+    // Hardware health & browser processing awareness
+    this.zeroSignalMs = 0;
+    this.isMutedHardware = false;
+    this.clippingHoldMs = 0;
+    this.lastCrestDb = null;
+    this.lastSpeechDeltaDb = null;
+    this.processing = {
+      autoGainControl: false,
+      noiseSuppression: false,
+      echoCancellation: false,
+    };
+  }
+
+  /**
+   * Updates detected browser audio processing flags (e.g. forced OS/browser AGC).
+   * @param {object} processing
+   */
+  setProcessing(processing = {}) {
+    this.processing = {
+      autoGainControl: Boolean(processing.autoGainControl),
+      noiseSuppression: Boolean(processing.noiseSuppression),
+      echoCancellation: Boolean(processing.echoCancellation),
+    };
   }
 
   /**
@@ -57,6 +101,7 @@ export class NoiseLevelEngine {
     this.calibrationSamples = [];
     this.newNoiseHint = false;
     this.persistentNoiseSec = 0;
+    this.impulseHoldMs = 0;
   }
 
   /**
@@ -113,8 +158,11 @@ export class NoiseLevelEngine {
    * @param {number} rawDb Current instantaneous RMS dBFS (-100 to 0)
    * @param {number} dtMs Delta time in milliseconds
    * @param {boolean} [muted=false] True when app audio is playing (protects against speaker feedback)
+   * @param {object|null} [meta=null] Optional worklet/analyzer features:
+   *   { peakDb, crestDb, speechDb, rumbleDb, isZeroBlock, isClipping }
    * @returns {{
    *   db: number,
+   *   detectorDb: number,
    *   floorDb: number,
    *   effectiveFloorDb: number,
    *   state: 'idle'|'calibrating'|'voice',
@@ -122,14 +170,18 @@ export class NoiseLevelEngine {
    *   progress: number,
    *   result: object|null,
    *   newNoiseHint: boolean,
-   *   isHot: boolean
+   *   isHot: boolean,
+   *   isImpulse: boolean,
+   *   isMutedHardware: boolean,
+   *   isClipping: boolean
    * }}
    */
-  feed(rawDb, dtMs, muted = false) {
+  feed(rawDb, dtMs, muted = false, meta = null) {
     const dtSec = Math.max(0.001, dtMs / 1000);
 
     // 1. If muted by own sound playback, freeze level and discard from statistics
     if (muted) {
+      this.wasMuted = true;
       const progress = this.state === 'calibrating'
         ? Math.min(1.0, this.calibrationElapsedMs / this.calibrationDurationMs)
         : this.state === 'voice'
@@ -138,6 +190,7 @@ export class NoiseLevelEngine {
 
       return {
         db: this.smoothedDb,
+        detectorDb: this.detectorDb,
         floorDb: this.floorDb,
         effectiveFloorDb: this.getEffectiveFloor(),
         state: this.state,
@@ -146,10 +199,74 @@ export class NoiseLevelEngine {
         result: null,
         newNoiseHint: this.newNoiseHint,
         isHot: this.floorDb >= this.cfg.hotFloorDb,
+        isImpulse: false,
+        isMutedHardware: this.isMutedHardware,
+        isClipping: this.clippingHoldMs > 0,
+        crestDb: this.lastCrestDb,
+        speechDeltaDb: this.lastSpeechDeltaDb,
       };
     }
 
-    // 2. Smooth instantaneous dB level
+    // Track hardware clipping flag with brief hold so UI can show it cleanly
+    if (meta?.isClipping) {
+      this.clippingHoldMs = 1500;
+    } else if (this.clippingHoldMs > 0) {
+      this.clippingHoldMs = Math.max(0, this.clippingHoldMs - dtMs);
+    }
+
+    // Compute detector candidate (rumble-penalized + impulse-gated)
+    let candidateDb = rawDb;
+    this.lastCrestDb = meta && typeof meta.crestDb === 'number' ? meta.crestDb : null;
+    if (meta && typeof meta.speechDb === 'number' && typeof meta.rumbleDb === 'number') {
+      this.lastSpeechDeltaDb = meta.speechDb - meta.rumbleDb;
+      const rumbleExcess = meta.rumbleDb - (meta.speechDb + this.cfg.rumbleMarginDb);
+      if (rumbleExcess > 0) {
+        candidateDb -= Math.min(this.cfg.rumblePenaltyDb, rumbleExcess * 0.75);
+      }
+    } else {
+      this.lastSpeechDeltaDb = null;
+    }
+
+    let isImpulse = false;
+    const hasCrest = this.lastCrestDb !== null;
+    if (hasCrest) {
+      const highCrest = meta.crestDb >= this.cfg.impulseCrestDb;
+      const elevatedAboveBase = candidateDb > this.impulseBaseDb + 5;
+
+      if (highCrest && this.impulseHoldMs === 0) {
+        this.impulseBaseDb = this.detectorDb;
+        this.impulseHoldMs = dtMs;
+        isImpulse = true;
+      } else if (this.impulseHoldMs > 0 && elevatedAboveBase && (highCrest || meta.crestDb >= this.cfg.impulseCrestDb - 2.5)) {
+        this.impulseHoldMs += dtMs;
+        if (this.impulseHoldMs <= this.cfg.impulseMaxMs) {
+          isImpulse = true;
+        }
+      } else {
+        this.impulseHoldMs = 0;
+        this.impulseBaseDb = this.detectorDb;
+      }
+    } else {
+      this.impulseHoldMs = 0;
+    }
+
+    if (isImpulse) {
+      // Suppress transient peak in detector channel so short impacts never trigger Red Zone
+      candidateDb = Math.min(candidateDb, this.impulseBaseDb + 1.5);
+    }
+
+    // 2. Smooth visual level and detector level
+    // If just exiting SFX mute and room is now quieter, drop immediately instead of trailing from pre-mute peak
+    if (this.wasMuted) {
+      this.wasMuted = false;
+      if (rawDb < this.smoothedDb) {
+        this.smoothedDb = rawDb;
+      }
+      if (candidateDb < this.detectorDb) {
+        this.detectorDb = candidateDb;
+      }
+    }
+
     this.smoothedDb = smooth(
       this.smoothedDb,
       rawDb,
@@ -158,13 +275,23 @@ export class NoiseLevelEngine {
       this.cfg.smoothingRelease
     );
 
+    this.detectorDb = smooth(
+      this.detectorDb,
+      candidateDb,
+      dtSec,
+      this.cfg.detectorAttack,
+      this.cfg.detectorRelease
+    );
+
     let progress = 0;
     let result = null;
 
     // 3. Calibration handling
     if (this.state === 'calibrating') {
       this.calibrationElapsedMs += dtMs;
-      this.calibrationSamples.push(rawDb);
+      if (!(meta?.isZeroBlock || rawDb <= -95)) {
+        this.calibrationSamples.push(rawDb);
+      }
       progress = Math.min(1.0, this.calibrationElapsedMs / this.calibrationDurationMs);
 
       if (progress >= 1.0) {
@@ -177,19 +304,19 @@ export class NoiseLevelEngine {
       this.voiceSamples.push(rawDb);
       progress = Math.min(1.0, this.voiceElapsedMs / this.voiceDurationMs);
 
-      // Check if voice has been heard loud enough
       const currentVoice = this._evaluateVoiceSamples();
       if (progress >= 1.0 || (currentVoice.heard && this.voiceElapsedMs >= 1800)) {
         this.state = 'idle';
         result = currentVoice;
       }
     } else {
-      // 5. Idle mode: slow downward-only baseline drift + persistent noise hint
-      this._updateSilenceTracking(rawDb, dtMs);
+      // 5. Idle mode: safe percentile downward-only baseline drift + stationary noise hint
+      this._updateSilenceTracking(rawDb, dtMs, meta);
     }
 
     return {
       db: this.smoothedDb,
+      detectorDb: this.detectorDb,
       floorDb: this.floorDb,
       effectiveFloorDb: this.getEffectiveFloor(),
       state: this.state,
@@ -198,6 +325,11 @@ export class NoiseLevelEngine {
       result,
       newNoiseHint: this.newNoiseHint,
       isHot: this.floorDb >= this.cfg.hotFloorDb,
+      isImpulse,
+      isMutedHardware: this.isMutedHardware,
+      isClipping: this.clippingHoldMs > 0,
+      crestDb: this.lastCrestDb,
+      speechDeltaDb: this.lastSpeechDeltaDb,
     };
   }
 
@@ -217,8 +349,11 @@ export class NoiseLevelEngine {
 
     // Clamp baseline between -85 and -15 dBFS (no artificial -44 dB ceiling!)
     this.floorDb = Math.max(-85, Math.min(-15, Math.round(p20 * 10) / 10));
-    // Immediately align smoothedDb to the freshly calibrated floor so UI settles in green
+    // Immediately align both envelopes to the freshly calibrated floor so UI settles in green
     this.smoothedDb = this.floorDb;
+    this.detectorDb = this.floorDb;
+    this.impulseBaseDb = this.floorDb;
+    this.impulseHoldMs = 0;
 
     this.calibrationSamples = [];
     this.newNoiseHint = false;
@@ -251,29 +386,48 @@ export class NoiseLevelEngine {
     };
   }
 
-  _updateSilenceTracking(rawDb, dtMs) {
+  _updateSilenceTracking(rawDb, dtMs, meta = null) {
+    const isZero = Boolean(meta?.isZeroBlock) || rawDb <= -95;
+    if (isZero) {
+      this.zeroSignalMs += dtMs;
+      if (this.zeroSignalMs >= this.cfg.zeroSignalWarnMs) {
+        this.isMutedHardware = true;
+      }
+      // Never let hardware-mute or audio-dropout digital zeros poison floorDb
+      return;
+    }
+
+    this.zeroSignalMs = 0;
+    this.isMutedHardware = false;
+
     this.minWindowMs += dtMs;
     this.minWindowSamples.push(rawDb);
 
     if (this.minWindowMs >= 3000) {
-      let windowMin = 0;
-      if (this.minWindowSamples.length > 0) {
-        windowMin = Math.min(...this.minWindowSamples);
-      } else {
-        windowMin = rawDb;
-      }
+      const samples = this.minWindowSamples;
       this.minWindowMs = 0;
       this.minWindowSamples = [];
 
-      // Downward drift only: if the room is genuinely quieter, slowly follow down
-      if (windowMin < this.floorDb) {
-        const step = (windowMin - this.floorDb) * 0.05;
+      if (samples.length === 0) return;
+
+      const sorted = [...samples].sort((a, b) => a - b);
+      const p15 = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.15))];
+      const p85 = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.85))];
+      const spread = p85 - p15;
+
+      // Downward drift only using 15th percentile (immune to single-frame glitches)
+      // Slower drift when browser/OS AGC is active so gain pumping doesn't chase floor down
+      if (p15 < this.floorDb) {
+        const driftRate = this.processing.autoGainControl ? 0.02 : 0.05;
+        const step = (p15 - this.floorDb) * driftRate;
         this.floorDb = Math.max(-85, this.floorDb + step);
       }
 
-      // Check for persistent new background noise (fan/projector started)
-      // As requested: the app does NOT automatically raise the floor, but hints to recalibrate.
-      if (windowMin >= this.floorDb + this.cfg.newNoiseDb) {
+      // Stationary background noise hint (projector / AC fan started):
+      // Only triggers on steady, low-modulation noise (spread <= stationarySpreadDb),
+      // so continuous classroom chatter does not trigger a false "recalibrate" hint.
+      const isStationary = spread <= this.cfg.stationarySpreadDb;
+      if (p15 >= this.floorDb + this.cfg.newNoiseDb && isStationary) {
         this.persistentNoiseSec += 3;
         if (this.persistentNoiseSec >= this.cfg.newNoiseSec) {
           this.newNoiseHint = true;

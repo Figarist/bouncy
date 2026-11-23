@@ -71,6 +71,11 @@ body.light-room .debug-bar button {
   color: #0F172A;
   border-color: #94A3B8;
 }
+body.light-room .debug-bar button.active {
+  background: var(--green);
+  color: var(--on-green);
+  border-color: var(--green);
+}
 
 * {
   box-sizing: border-box;
@@ -1363,12 +1368,27 @@ body.light-room .ring-bg {
   padding: 4px 10px;
   border-radius: 6px;
   cursor: pointer;
+  white-space: nowrap;
 }
 .debug-bar button:hover {
   background: #555;
 }
+.debug-bar button.active {
+  background: var(--green);
+  color: var(--on-green);
+  border-color: var(--green);
+  font-weight: 700;
+}
 .debug-bar input[type="range"] {
   flex: 1;
+  min-width: 120px;
+}
+.debug-bar input[type="range"].is-inactive {
+  opacity: 0.4;
+}
+.debug-dsp-readout {
+  color: #94A3B8;
+  white-space: nowrap;
 }
 
 /* Utility */

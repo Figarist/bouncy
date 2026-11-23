@@ -135,7 +135,8 @@ export class SoundSynthesizer {
   }
 
   markSfxPlaying(durationMs) {
-    this.lastSfxEndTime = performance.now() + durationMs;
+    const endAt = performance.now() + Math.max(0, durationMs);
+    this.lastSfxEndTime = Math.max(this.lastSfxEndTime, endAt);
   }
 
   /**

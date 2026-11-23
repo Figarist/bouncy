@@ -744,7 +744,16 @@ export class TeacherPanel {
   }
 
   
-  updateMicLiveMeter(rawDb, smoothedDb, ambientDb, yellowDb, redDb, currentZone = null, isActive = true, isHot = false, processing = null, dtSec = 0.016) {
+  updateMicLiveMeter(rawDb, smoothedDb, ambientDb, yellowDb, redDb, currentZone = null, isActive = true, isHot = false, processing = null, dtSec = 0.016, health = null) {
+    const pill = this.panel.querySelector('#mic-pill');
+    if (pill && this.isListening) {
+      if (health?.isMutedHardware) {
+        pill.textContent = 'Немає сигналу';
+      } else {
+        pill.textContent = 'Слухає клас';
+      }
+    }
+
     if (!this.isOpen && !getOpenPopover()) return;
     const miniFill = this.panel.querySelector('#mini-meter-fill');
     if (!isActive) {
@@ -788,7 +797,7 @@ export class TeacherPanel {
 
       if (agcEl && processing) {
         if (processing.autoGainControl) {
-          agcEl.textContent = 'Увімкнено (може заважати)';
+          agcEl.textContent = 'Увімкнено (компенсується)';
           agcEl.style.color = 'var(--zone-yellow)';
         } else {
           agcEl.textContent = 'Вимкнено';
@@ -797,7 +806,14 @@ export class TeacherPanel {
       }
 
       if (warnEl) {
-        warnEl.classList.toggle('hidden', !isHot);
+        let warnText = '';
+        if (health?.isMutedHardware) {
+          warnText = 'Мікрофон не передає звук (можливо, вимкнено кнопкою на корпусі або обрано інший пристрій).';
+        } else if (health?.isClipping || isHot) {
+          warnText = 'Увага: рівень мікрофона в системі дуже високий. Зменшіть гучність мікрофона в налаштуваннях ПК.';
+        }
+        warnEl.textContent = warnText;
+        warnEl.classList.toggle('hidden', !warnText);
       }
     }
   }
