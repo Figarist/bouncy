@@ -44,12 +44,33 @@ import {
 class GameApp {
   constructor() {
     this.canvas = document.getElementById('game-canvas');
+    const hasSavedState = (() => {
+      try { return !!localStorage.getItem('tyhyi-klas:v1'); } catch { return false; }
+    })();
     this.state = StorageManager.load();
 
     const urlLang = new URLSearchParams(window.location.search).get('lang');
-    const activeLang = (urlLang === 'en' || urlLang === 'pl' || urlLang === 'uk')
+    let activeLang = (urlLang === 'en' || urlLang === 'pl' || urlLang === 'uk')
       ? urlLang
-      : (this.state.settings.lang || 'uk');
+      : null;
+    if (!activeLang && !hasSavedState) {
+      const isBot = navigator.webdriver || /bot|crawl|spider|slurp|facebookexternalhit|lighthouse|headless|bingpreview|yandex|baidu|duckduckbot|applebot|semrush|ahrefs/i.test(navigator.userAgent || '');
+      if (!isBot) {
+        const supported = ['uk', 'en', 'pl'];
+        const langs = (navigator.languages && navigator.languages.length)
+          ? navigator.languages
+          : [navigator.language || navigator.userLanguage || 'uk'];
+        for (const l of langs) {
+          const base = String(l || '').toLowerCase().split('-')[0];
+          if (supported.includes(base)) {
+            activeLang = base;
+            break;
+          }
+        }
+      }
+    }
+    if (!activeLang) activeLang = this.state.settings.lang || 'uk';
+    this.state.settings.lang = activeLang;
     setLanguage(activeLang);
     document.documentElement.lang = activeLang;
     // Keep canonical/og:url self-consistent with the sitemap for explicit ?lang= variants
