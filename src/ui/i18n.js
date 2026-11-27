@@ -37,6 +37,8 @@ export const translations = {
     modeGroups: 'Робота в групах',
     modeBreak: 'Перерва / Класика',
     privacyNote: 'Звук обробляється локально в браузері без запису та передачі на сервер.',
+    privacyPolicy: 'Політика конфіденційності',
+    privacyUrl: 'https://sivochka.com/uk/privacy/',
     hotkeysHelp: 'Клавіші: Space (пауза), M (мікрофон), C (калібрування), F (екран), 1/2/3 (режими), T (таймер), S (+зірка), H (панель)',
   },
   en: {
@@ -77,6 +79,8 @@ export const translations = {
     modeGroups: 'Group Work',
     modeBreak: 'Break / Classic',
     privacyNote: 'Audio is processed locally in the browser and never stored or transmitted.',
+    privacyPolicy: 'Privacy policy',
+    privacyUrl: 'https://sivochka.com/privacy/',
     hotkeysHelp: 'Keys: Space (pause), M (mic), C (calibrate), F (fullscreen), 1/2/3 (modes), T (timer), S (+star), H (panel)',
   },
   pl: {
@@ -117,6 +121,8 @@ export const translations = {
     modeGroups: 'Praca w grupach',
     modeBreak: 'Przerwa / Klasyka',
     privacyNote: 'Dźwięk jest przetwarzany wyłącznie lokalnie w przeglądarce bez nagrywania ani wysyłania.',
+    privacyPolicy: 'Polityka prywatności',
+    privacyUrl: 'https://sivochka.com/privacy/',
     hotkeysHelp: 'Klawisze: Spacja (pauza), M (mikrofon), C (kalibracja), F (ekran), 1/2/3 (tryby), T (minutnik), S (+gwiazdka), H (panel)',
   },
 };
