@@ -254,8 +254,8 @@ class GameApp {
     this.hud.updateStars(
       this.displayedStars,
       this.stars.goal,
-      this.stars.getProgress(),
-      this.stars.isGolden(),
+      Math.min(1.0, (this.stars.currentStarProgressSeconds || 0) / (this.stars.secondsPerStar || 1)),
+      Boolean(this.stars.isGoldenCombo),
       cData.reward || t('defaultReward')
     );
     this.hud.updateTimer(
