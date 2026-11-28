@@ -70,7 +70,7 @@ class GameApp {
     this.state.settings.lang = activeLang;
     setLanguage(activeLang);
     // Keep canonical/og:url self-consistent with the sitemap for explicit ?lang= variants
-    if (urlLang === 'en' || urlLang === 'pl' || urlLang === 'ru') {
+    if (urlLang === 'en' || urlLang === 'pl' || urlLang === 'ru' || urlLang === 'ko') {
       const variant = `https://sivochka.com/bouncy/?lang=${urlLang}`;
       document.querySelector('link[rel="canonical"]')?.setAttribute('href', variant);
       document.querySelector('meta[property="og:url"]')?.setAttribute('content', variant);
@@ -214,7 +214,7 @@ class GameApp {
   syncSeoLanguage(lang) {
     document.documentElement.lang = lang;
     document.title = t('docTitle');
-    const ogLocales = { uk: 'uk_UA', en: 'en_US', pl: 'pl_PL', ru: 'ru_RU' };
+    const ogLocales = { uk: 'uk_UA', en: 'en_US', pl: 'pl_PL', ru: 'ru_RU', ko: 'ko_KR' };
     document.querySelector('meta[name="description"]')?.setAttribute('content', t('docDescription'));
     document.querySelector('meta[property="og:title"]')?.setAttribute('content', t('docTitle'));
     document.querySelector('meta[property="og:description"]')?.setAttribute('content', t('docDescription'));

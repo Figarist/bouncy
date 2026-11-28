@@ -1,10 +1,12 @@
-import { t, getLanguage, SUPPORTED_LANGS } from './i18n.js';
+import { t, getLanguage } from './i18n.js';
 import { iconPlay, iconCalibrate, iconFullscreen, iconStar } from './icons.js';
+import { renderLangDropdown, bindLangDropdown } from './lang-dropdown.js';
 
 export class IntroOverlay {
   constructor(onStart, onLanguageChange = null) {
     this.onStart = onStart;
     this.onLanguageChange = onLanguageChange;
+    this.langAbort = null;
     this.overlay = document.createElement('div');
     this.overlay.className = 'intro-overlay';
 
@@ -13,14 +15,13 @@ export class IntroOverlay {
   }
 
   render() {
+    this.langAbort?.abort();
+    this.langAbort = new AbortController();
+
     const lang = getLanguage();
     this.overlay.innerHTML = `
       <div class="intro-card">
-        <div class="liquid-glass-pillbar intro-lang-bar" role="group" aria-label="${t('languageLabel')}">
-          ${SUPPORTED_LANGS.map((l) => `
-            <button type="button" class="liquid-glass-tab ${lang === l ? 'active' : ''}" data-lang="${l}">${l.toUpperCase()}</button>
-          `).join('')}
-        </div>
+        ${renderLangDropdown(lang, 'intro-lang-bar')}
         <!-- Illustrative Critters Trio Preview -->
         <div class="intro-critter-stage">
           <svg viewBox="0 0 240 100" width="240" height="100" class="intro-trio-svg">
@@ -117,11 +118,11 @@ export class IntroOverlay {
       </div>
     `;
 
-    this.overlay.querySelectorAll('.intro-lang-bar [data-lang]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        this.onLanguageChange?.(btn.dataset.lang);
-      });
-    });
+    bindLangDropdown(
+      this.overlay.querySelector('.intro-lang-bar'),
+      (nextLang) => this.onLanguageChange?.(nextLang),
+      this.langAbort.signal
+    );
 
     const btn = this.overlay.querySelector('#btn-start-game');
     btn.addEventListener('click', () => {
@@ -131,6 +132,8 @@ export class IntroOverlay {
   }
 
   hide() {
+    this.langAbort?.abort();
+    this.langAbort = null;
     this.overlay.classList.add('fade-out');
     setTimeout(() => {
       this.overlay.remove();

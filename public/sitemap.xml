@@ -10,6 +10,7 @@
     <xhtml:link rel="alternate" hreflang="en" href="https://sivochka.com/bouncy/?lang=en" />
     <xhtml:link rel="alternate" hreflang="pl" href="https://sivochka.com/bouncy/?lang=pl" />
     <xhtml:link rel="alternate" hreflang="ru" href="https://sivochka.com/bouncy/?lang=ru" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://sivochka.com/bouncy/?lang=ko" />
   </url>
   <url>
     <loc>https://sivochka.com/bouncy/?lang=en</loc>
@@ -21,6 +22,7 @@
     <xhtml:link rel="alternate" hreflang="en" href="https://sivochka.com/bouncy/?lang=en" />
     <xhtml:link rel="alternate" hreflang="pl" href="https://sivochka.com/bouncy/?lang=pl" />
     <xhtml:link rel="alternate" hreflang="ru" href="https://sivochka.com/bouncy/?lang=ru" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://sivochka.com/bouncy/?lang=ko" />
   </url>
   <url>
     <loc>https://sivochka.com/bouncy/?lang=pl</loc>
@@ -32,6 +34,7 @@
     <xhtml:link rel="alternate" hreflang="en" href="https://sivochka.com/bouncy/?lang=en" />
     <xhtml:link rel="alternate" hreflang="pl" href="https://sivochka.com/bouncy/?lang=pl" />
     <xhtml:link rel="alternate" hreflang="ru" href="https://sivochka.com/bouncy/?lang=ru" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://sivochka.com/bouncy/?lang=ko" />
   </url>
   <url>
     <loc>https://sivochka.com/bouncy/?lang=ru</loc>
@@ -43,5 +46,18 @@
     <xhtml:link rel="alternate" hreflang="en" href="https://sivochka.com/bouncy/?lang=en" />
     <xhtml:link rel="alternate" hreflang="pl" href="https://sivochka.com/bouncy/?lang=pl" />
     <xhtml:link rel="alternate" hreflang="ru" href="https://sivochka.com/bouncy/?lang=ru" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://sivochka.com/bouncy/?lang=ko" />
+  </url>
+  <url>
+    <loc>https://sivochka.com/bouncy/?lang=ko</loc>
+    <lastmod>2026-11-28</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sivochka.com/bouncy/" />
+    <xhtml:link rel="alternate" hreflang="uk" href="https://sivochka.com/bouncy/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://sivochka.com/bouncy/?lang=en" />
+    <xhtml:link rel="alternate" hreflang="pl" href="https://sivochka.com/bouncy/?lang=pl" />
+    <xhtml:link rel="alternate" hreflang="ru" href="https://sivochka.com/bouncy/?lang=ru" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://sivochka.com/bouncy/?lang=ko" />
   </url>
 </urlset>

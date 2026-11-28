@@ -1,4 +1,5 @@
-import { t, getLanguage, getLocale, SUPPORTED_LANGS } from './i18n.js';
+import { t, getLanguage, getLocale } from './i18n.js';
+import { renderLangDropdown, bindLangDropdown } from './lang-dropdown.js';
 import {
   iconMic,
   iconCalibrate,
@@ -143,11 +144,7 @@ export class TeacherPanel {
             <span class="list-row-text">
               <span class="list-row-title">${escapeHtml(t('languageLabel'))}</span>
             </span>
-            <div class="liquid-glass-pillbar panel-pillbar lang-pillbar" id="panel-lang-control">
-              ${SUPPORTED_LANGS.map((l) => `
-                <button type="button" class="liquid-glass-tab ${lang === l ? 'active' : ''}" data-lang="${l}">${l.toUpperCase()}</button>
-              `).join('')}
-            </div>
+            ${renderLangDropdown(lang, 'panel-lang-dropdown', 'panel-lang-control')}
           </div>
 
           <button class="list-row" id="row-theme">
@@ -285,11 +282,13 @@ export class TeacherPanel {
     this.panel.querySelector('#btn-toggle-mic').addEventListener('click', () => this.callbacks.onMicToggle());
     this.panel.querySelector('#btn-calibrate').addEventListener('click', () => this.callbacks.onCalibrate());
 
-    this.panel.querySelectorAll('#panel-lang-control [data-lang]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        this.callbacks.onLanguageChange?.(btn.dataset.lang);
-      });
-    });
+    this.langAbort?.abort();
+    this.langAbort = new AbortController();
+    bindLangDropdown(
+      this.panel.querySelector('#panel-lang-control'),
+      (nextLang) => this.callbacks.onLanguageChange?.(nextLang),
+      this.langAbort.signal
+    );
 
     this.panel.querySelector('#row-mic-advanced').addEventListener('click', (e) => this.openMicPopover(e.currentTarget));
     this.panel.querySelector('#row-theme').addEventListener('click', (e) => this.openThemePopover(e.currentTarget));

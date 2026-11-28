@@ -1,9 +1,19 @@
 import { translations, SUPPORTED_LANGS } from '../src/ui/i18n.js';
 
+const EXPECTED_LANGS = ['uk', 'en', 'pl', 'ru', 'ko'];
 const UK_ONLY_CYRILLIC_RE = /[єіїґЄІЇҐ]/;
 const errors = [];
 
+for (const lang of EXPECTED_LANGS) {
+  if (!SUPPORTED_LANGS.includes(lang)) {
+    errors.push(`SUPPORTED_LANGS is missing expected locale: ${lang}`);
+  }
+}
+
 for (const lang of SUPPORTED_LANGS) {
+  if (!EXPECTED_LANGS.includes(lang)) {
+    errors.push(`Unexpected locale in SUPPORTED_LANGS: ${lang}`);
+  }
   if (!translations[lang] || typeof translations[lang] !== 'object') {
     errors.push(`Missing locale dictionary: ${lang}`);
   }
@@ -12,7 +22,7 @@ for (const lang of SUPPORTED_LANGS) {
 if (errors.length === 0) {
   const baseKeys = Object.keys(translations.uk);
 
-  for (const lang of SUPPORTED_LANGS) {
+  for (const lang of EXPECTED_LANGS) {
     const dict = translations[lang];
     const langKeys = Object.keys(dict);
 
@@ -49,4 +59,4 @@ if (errors.length > 0) {
 }
 
 const keyCount = Object.keys(translations.uk).length;
-console.log(`i18n check passed: ${SUPPORTED_LANGS.length} locales (${SUPPORTED_LANGS.join(', ')}), ${keyCount} keys each, 0 leaks.`);
+console.log(`i18n check passed: ${EXPECTED_LANGS.length} locales (${EXPECTED_LANGS.join(', ')}), ${keyCount} keys each, 0 leaks.`);
