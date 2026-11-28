@@ -6,6 +6,7 @@
  */
 
 import { MAX_CUSTOM_SOUNDS, prepareSamples, encodeWav } from './sound-process.js';
+import { t } from '../ui/i18n.js';
 
 const DB_NAME = 'tyhyi-klas-audio';
 const DB_VERSION = 1;
@@ -93,21 +94,21 @@ export async function getAllCustomSounds() {
  * @returns {Promise<{id: string, name: string, wav: ArrayBuffer}|{error: string}>}
  */
 export async function addCustomSoundFile(file, audioCtx) {
-  if (!file) return { error: 'Файл не обрано' };
+  if (!file) return { error: t('soundErrNoFile') };
   if (file.size > 15 * 1024 * 1024) {
-    return { error: 'Файл завеликий (максимум 15 МБ)' };
+    return { error: t('soundErrTooBig') };
   }
 
   const existing = await listCustomSounds();
   if (existing.length >= MAX_CUSTOM_SOUNDS) {
-    return { error: `Досягнуто ліміт (${MAX_CUSTOM_SOUNDS} звуків). Видаліть непотрібний звук.` };
+    return { error: t('soundErrLimit', { max: MAX_CUSTOM_SOUNDS }) };
   }
 
   let arrayBuffer;
   try {
     arrayBuffer = await file.arrayBuffer();
   } catch {
-    return { error: 'Не вдалося прочитати файл' };
+    return { error: t('soundErrRead') };
   }
 
   let decoded;
@@ -115,7 +116,7 @@ export async function addCustomSoundFile(file, audioCtx) {
     // decodeAudioData consumes arrayBuffer; slice copy to be safe
     decoded = await audioCtx.decodeAudioData(arrayBuffer.slice(0));
   } catch {
-    return { error: 'Цей файл не схожий на аудіо, або формат не підтримується' };
+    return { error: t('soundErrDecode') };
   }
 
   const channels = [];
@@ -127,8 +128,8 @@ export async function addCustomSoundFile(file, audioCtx) {
   const wavBuffer = encodeWav(processedSamples);
 
   // Generate safe ID and display name
-  const rawName = (file.name || 'Свій звук').replace(/\.[a-z0-9]+$/i, '').trim();
-  const name = rawName.slice(0, 30) || 'Свій звук';
+  const rawName = (file.name || t('customSoundDefault')).replace(/\.[a-z0-9]+$/i, '').trim();
+  const name = rawName.slice(0, 30) || t('customSoundDefault');
   const id = `custom:${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 
   const record = {
@@ -139,7 +140,7 @@ export async function addCustomSoundFile(file, audioCtx) {
   };
 
   const db = await openDb();
-  if (!db) return { error: 'Сховище браузера (IndexedDB) недоступне' };
+  if (!db) return { error: t('soundErrDbUnavailable') };
 
   return new Promise((resolve) => {
     try {
@@ -147,9 +148,9 @@ export async function addCustomSoundFile(file, audioCtx) {
       const store = tx.objectStore(STORE_NAME);
       const req = store.put(record);
       req.onsuccess = () => resolve(record);
-      req.onerror = () => resolve({ error: 'Помилка збереження в базу даних' });
+      req.onerror = () => resolve({ error: t('soundErrDbSave') });
     } catch {
-      resolve({ error: 'Помилка збереження звуку' });
+      resolve({ error: t('soundErrSave') });
     }
   });
 }
@@ -168,7 +169,7 @@ export async function putCustomSoundRecord(record) {
       const store = tx.objectStore(STORE_NAME);
       const req = store.put({
         id: record.id,
-        name: (record.name || 'Свій звук').slice(0, 30),
+        name: (record.name || t('customSoundDefault')).slice(0, 30),
         addedAt: record.addedAt || new Date().toISOString(),
         wav: record.wav,
       });

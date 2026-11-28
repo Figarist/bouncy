@@ -3,6 +3,7 @@
 // If this page's own bundle is in that list, the page already runs the new build ("Оновлено");
 // otherwise the tab was opened before the deploy and offers a reload ("Доступна нова версія").
 import { iconClose } from './icons.js';
+import { t } from './i18n.js';
 
 const UPDATE_CHECK_MS = 30 * 60 * 1000;
 const UPDATED_TOAST_MS = 8000;
@@ -40,10 +41,10 @@ function showUpdateToast(isCurrent) {
   toast.className = 'update-toast';
   toast.setAttribute('role', 'status');
   toast.innerHTML = isCurrent
-    ? `<span class="update-toast-text"><strong>Оновлено</strong> Тихий клас працює на свіжій версії.</span>`
-    : `<span class="update-toast-text"><strong>Доступна нова версія</strong> Оновіть, коли буде зручно — зірки збережуться.</span>
-       <button class="update-toast-reload" type="button">Оновити</button>`;
-  toast.insertAdjacentHTML('beforeend', `<button class="update-toast-close" type="button" aria-label="Закрити">${iconClose()}</button>`);
+    ? `<span class="update-toast-text">${t('swUpdated')}</span>`
+    : `<span class="update-toast-text">${t('swNewVersion')}</span>
+       <button class="update-toast-reload" type="button">${t('swReloadBtn')}</button>`;
+  toast.insertAdjacentHTML('beforeend', `<button class="update-toast-close" type="button" aria-label="${t('closeBtn')}">${iconClose()}</button>`);
   toast.querySelector('.update-toast-close').addEventListener('click', () => toast.remove());
   toast.querySelector('.update-toast-reload')?.addEventListener('click', () => location.reload());
   document.body.appendChild(toast);

@@ -34,7 +34,7 @@ import { IntroOverlay } from './ui/intro.js';
 import { iconLab } from './ui/icons.js';
 import { initServiceWorker } from './ui/update-notice.js';
 import { TabIndicator } from './ui/tab-indicator.js';
-import { setLanguage, t } from './ui/i18n.js';
+import { setLanguage, t, SUPPORTED_LANGS } from './ui/i18n.js';
 import {
   BackgroundWatchdog,
   BackgroundTicker,
@@ -50,19 +50,16 @@ class GameApp {
     this.state = StorageManager.load();
 
     const urlLang = new URLSearchParams(window.location.search).get('lang');
-    let activeLang = (urlLang === 'en' || urlLang === 'pl' || urlLang === 'uk')
-      ? urlLang
-      : null;
+    let activeLang = SUPPORTED_LANGS.includes(urlLang) ? urlLang : null;
     if (!activeLang && !hasSavedState) {
       const isBot = navigator.webdriver || /bot|crawl|spider|slurp|facebookexternalhit|lighthouse|headless|bingpreview|yandex|baidu|duckduckbot|applebot|semrush|ahrefs/i.test(navigator.userAgent || '');
       if (!isBot) {
-        const supported = ['uk', 'en', 'pl'];
         const langs = (navigator.languages && navigator.languages.length)
           ? navigator.languages
           : [navigator.language || navigator.userLanguage || 'uk'];
         for (const l of langs) {
           const base = String(l || '').toLowerCase().split('-')[0];
-          if (supported.includes(base)) {
+          if (SUPPORTED_LANGS.includes(base)) {
             activeLang = base;
             break;
           }
@@ -72,16 +69,13 @@ class GameApp {
     if (!activeLang) activeLang = this.state.settings.lang || 'uk';
     this.state.settings.lang = activeLang;
     setLanguage(activeLang);
-    document.documentElement.lang = activeLang;
     // Keep canonical/og:url self-consistent with the sitemap for explicit ?lang= variants
-    if (urlLang === 'en' || urlLang === 'pl') {
+    if (urlLang === 'en' || urlLang === 'pl' || urlLang === 'ru') {
       const variant = `https://sivochka.com/bouncy/?lang=${urlLang}`;
       document.querySelector('link[rel="canonical"]')?.setAttribute('href', variant);
       document.querySelector('meta[property="og:url"]')?.setAttribute('content', variant);
     }
-    if (activeLang !== 'uk') {
-      document.title = `${t('appTitle')} — ${t('appSubtitle')}`;
-    }
+    this.syncSeoLanguage(activeLang);
 
     // Core engines
     this.physics = new PhysicsWorld();
@@ -181,14 +175,14 @@ class GameApp {
       if (status === 'disconnected') {
         this.panel.setMicButtonState(false);
         this.hud.showMicStatusToast(
-          'Мікрофон відключився',
-          'Спробую підключити інший пристрій автоматично або оберіть мікрофон у налаштуваннях.'
+          t('micDisconnectedTitle'),
+          t('micDisconnectedBody')
         );
       } else if (status === 'reconnected') {
         this.panel.setMicButtonState(true);
         this.hud.showMicStatusToast(
-          'Мікрофон знову працює',
-          'Зв’язок із пристроєм відновлено автоматично.'
+          t('micReconnectedTitle'),
+          t('micReconnectedBody')
         );
       }
     };
@@ -205,12 +199,84 @@ class GameApp {
     this.initVisibilityHandling();
 
     // Start with Intro
-    new IntroOverlay(() => {
-      this.startLesson();
-    });
+    this.intro = new IntroOverlay(
+      () => {
+        this.intro = null;
+        this.startLesson();
+      },
+      (lang) => this.applyLanguage(lang)
+    );
 
     // Start animation loop
     requestAnimationFrame(this.loop.bind(this));
+  }
+
+  syncSeoLanguage(lang) {
+    document.documentElement.lang = lang;
+    document.title = t('docTitle');
+    const ogLocales = { uk: 'uk_UA', en: 'en_US', pl: 'pl_PL', ru: 'ru_RU' };
+    document.querySelector('meta[name="description"]')?.setAttribute('content', t('docDescription'));
+    document.querySelector('meta[property="og:title"]')?.setAttribute('content', t('docTitle'));
+    document.querySelector('meta[property="og:description"]')?.setAttribute('content', t('docDescription'));
+    document.querySelector('meta[property="og:locale"]')?.setAttribute('content', ogLocales[lang] || 'uk_UA');
+    document.querySelector('meta[name="twitter:title"]')?.setAttribute('content', t('docTitle'));
+    document.querySelector('meta[name="twitter:description"]')?.setAttribute('content', t('docDescription'));
+
+    const faq = document.getElementById('faq');
+    if (faq) {
+      if (faq.dataset.i18nAria) faq.setAttribute('aria-label', t(faq.dataset.i18nAria));
+      faq.querySelectorAll('[data-i18n]').forEach((el) => {
+        el.textContent = t(el.dataset.i18n);
+      });
+      faq.querySelectorAll('[data-i18n-html]').forEach((el) => {
+        el.innerHTML = t(el.dataset.i18nHtml);
+      });
+      faq.querySelectorAll('[data-i18n-aria]').forEach((el) => {
+        el.setAttribute('aria-label', t(el.dataset.i18nAria));
+      });
+    }
+  }
+
+  applyLanguage(lang) {
+    if (!SUPPORTED_LANGS.includes(lang)) return;
+    this.state.settings.lang = lang;
+    setLanguage(lang);
+    this.syncSeoLanguage(lang);
+    this.tabIndicator?.refreshBaseTitle();
+
+    const activeClass = this.state.activeClass;
+    const cData = this.state.classes[activeClass] || createClassRecord();
+    const modeCfg = this.session.getModeConfig();
+
+    this.hud.render();
+    this.hud.updateMode(modeCfg.id);
+    this.hud.setClassName(activeClass, cData.color);
+    this.hud.updateStars(
+      this.displayedStars,
+      this.stars.goal,
+      this.stars.getProgress(),
+      this.stars.isGolden(),
+      cData.reward || t('defaultReward')
+    );
+    this.hud.updateTimer(
+      this.session.timerRemainingSeconds,
+      this.session.timerRunning,
+      this.session.timerTotalSeconds
+    );
+
+    this.panel.render();
+    this.panel.bindEvents();
+    this.panel.setMicButtonState(this.mic.isListening);
+    this.panel.setCalibrateButtonState(this.mic.isCalibrating);
+
+    this.sidebar.render();
+    this.sidebar.applySavedPosition();
+
+    if (this.intro && this.intro.overlay?.isConnected) {
+      this.intro.render();
+    }
+
+    this.saveState();
   }
 
   async toggleMicrophone() {
@@ -250,7 +316,7 @@ class GameApp {
         this.state.classes[name] = createClassRecord({ color: nextClassColor(this.state.classes) });
         this.state.classOrder = [...classNames(this.state).filter((n) => n !== name), name];
         this.switchClass(name);
-        StorageManager.takeSnapshot(this.state, `Додано «${name}»`);
+        StorageManager.takeSnapshot(this.state, t('snapClassAdded', { name }));
         return true;
       },
       onRename: (oldName, newName) => {
@@ -287,7 +353,7 @@ class GameApp {
       onDelete: (className) => {
         const keys = Object.keys(this.state.classes);
         if (keys.length <= 1) return;
-        StorageManager.takeSnapshot(this.state, `Перед видаленням «${className}»`);
+        StorageManager.takeSnapshot(this.state, t('snapBeforeDelete', { name: className }));
         delete this.state.classes[className];
         this.state.classOrder = classNames(this.state);
         this.switchClass(this.state.classOrder[0]);
@@ -455,6 +521,9 @@ class GameApp {
         this.applyLightRoom(isLight);
         this.saveState();
       },
+      onLanguageChange: (lang) => {
+        this.applyLanguage(lang);
+      },
       onFullscreen: () => {
         this.toggleFullscreen();
       },
@@ -590,7 +659,7 @@ class GameApp {
   resetCurrentStars() {
     const cData = this.state.classes[this.state.activeClass];
     if (cData && cData.stars > 0) {
-      StorageManager.takeSnapshot(this.state, `Перед скиданням банки «${this.state.activeClass}»`);
+      StorageManager.takeSnapshot(this.state, t('snapBeforeReset', { name: this.state.activeClass }));
     }
     if (cData) {
       cData.stars = 0;
@@ -599,7 +668,7 @@ class GameApp {
     this.displayedStars = 0;
     this.hasCelebratedGoal = false;
     this.saveState();
-    this.hud.updateStars(0, this.stars.goal, 0, false, cData?.reward || 'Нагорода');
+    this.hud.updateStars(0, this.stars.goal, 0, false, cData?.reward || t('rewardFallback'));
     this.sidebar.update();
   }
 
@@ -611,14 +680,14 @@ class GameApp {
         cData.goalsReached = (cData.goalsReached || 0) + 1;
         recordPrize(cData, cData.reward);
         this.saveState();
-        StorageManager.takeSnapshot(this.state, `Ціль досягнуто: «${this.state.activeClass}»`);
+        StorageManager.takeSnapshot(this.state, t('snapGoalReached', { name: this.state.activeClass }));
         this.sidebar.update();
       }
       sfx.playFanfare();
       if (!document.hidden) {
         this.renderer.particles.spawnConfetti(this.renderer.width, this.renderer.height);
       }
-      this.hud.showGoalReachedModal(cData?.reward || '5 хв мультика', () => {
+      this.hud.showGoalReachedModal(cData?.reward || t('defaultReward'), () => {
         this.resetCurrentStars();
       });
     }
@@ -810,13 +879,13 @@ class GameApp {
       debugBar.className = 'debug-bar';
       debugBar.innerHTML = `
         <span>${iconLab()}</span>
-        <button id="sim-source-mic" class="debug-source-btn active" title="Використовувати реальний мікрофон">Мікрофон</button>
-        <button id="sim-source-sim" class="debug-source-btn" title="Використовувати повзунок симулятора">Симулятор</button>
+        <button id="sim-source-mic" class="debug-source-btn active" title="${t('debugSourceMicTitle')}">${t('debugSourceMic')}</button>
+        <button id="sim-source-sim" class="debug-source-btn" title="${t('debugSourceSimTitle')}">${t('debugSourceSim')}</button>
         <input type="range" id="sim-slider" min="-80" max="-10" step="1" value="-60">
         <span id="sim-val">LIVE</span>
-        <button id="sim-zero-btn">Тиша</button>
-        <button id="sim-stir-btn">Шепіт</button>
-        <button id="sim-shout-btn">Крик!</button>
+        <button id="sim-zero-btn">${t('debugSilence')}</button>
+        <button id="sim-stir-btn">${t('debugWhisper')}</button>
+        <button id="sim-shout-btn">${t('debugShout')}</button>
         <span id="debug-dsp-readout" class="debug-dsp-readout"></span>
         <span id="fps-counter" style="margin-left: auto;">FPS: 60</span>
       `;
@@ -1034,7 +1103,7 @@ class GameApp {
       this.stars.goal,
       snap.starRes.progress,
       snap.starRes.isGolden,
-      activeClassData?.reward || '5 хв мультика'
+      activeClassData?.reward || t('defaultReward')
     );
     this.hud.updateTimer(
       snap.timerRes.remaining,

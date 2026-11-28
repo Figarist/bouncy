@@ -1,13 +1,26 @@
-import { t } from './i18n.js';
+import { t, getLanguage, SUPPORTED_LANGS } from './i18n.js';
 import { iconPlay, iconCalibrate, iconFullscreen, iconStar } from './icons.js';
 
 export class IntroOverlay {
-  constructor(onStart) {
+  constructor(onStart, onLanguageChange = null) {
+    this.onStart = onStart;
+    this.onLanguageChange = onLanguageChange;
     this.overlay = document.createElement('div');
     this.overlay.className = 'intro-overlay';
 
+    this.render();
+    document.body.appendChild(this.overlay);
+  }
+
+  render() {
+    const lang = getLanguage();
     this.overlay.innerHTML = `
       <div class="intro-card">
+        <div class="liquid-glass-pillbar intro-lang-bar" role="group" aria-label="${t('languageLabel')}">
+          ${SUPPORTED_LANGS.map((l) => `
+            <button type="button" class="liquid-glass-tab ${lang === l ? 'active' : ''}" data-lang="${l}">${l.toUpperCase()}</button>
+          `).join('')}
+        </div>
         <!-- Illustrative Critters Trio Preview -->
         <div class="intro-critter-stage">
           <svg viewBox="0 0 240 100" width="240" height="100" class="intro-trio-svg">
@@ -92,24 +105,28 @@ export class IntroOverlay {
 
         <div class="intro-hints">
           <div class="hint-item">
-            ${iconCalibrate()} <span>Натисніть <b>C</b> або кнопку калібрування в тиші класу</span>
+            ${iconCalibrate()} <span>${t('introHintCalibrate')}</span>
           </div>
           <div class="hint-item">
-            ${iconFullscreen()} <span>Клавіша <b>F</b> — повноекранний режим для проектора та ТВ</span>
+            ${iconFullscreen()} <span>${t('introHintFullscreen')}</span>
           </div>
           <div class="hint-item">
-            ${iconStar(true)} <span>Клас збирає зірки в банку за кожні 30 секунд тиші</span>
+            ${iconStar(true)} <span>${t('introHintStars')}</span>
           </div>
         </div>
       </div>
     `;
 
-    document.body.appendChild(this.overlay);
+    this.overlay.querySelectorAll('.intro-lang-bar [data-lang]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        this.onLanguageChange?.(btn.dataset.lang);
+      });
+    });
 
     const btn = this.overlay.querySelector('#btn-start-game');
     btn.addEventListener('click', () => {
       this.hide();
-      if (onStart) onStart();
+      if (this.onStart) this.onStart();
     });
   }
 

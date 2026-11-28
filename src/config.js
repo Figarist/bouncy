@@ -6,7 +6,7 @@ export const CONFIG = {
     hpfFrequencyHz: 180,         // 4th-order Butterworth HPF cutoff; raise (200–220) to cut more desk/HVAC bass
     lpfFrequencyHz: 4000,        // 2nd-order LPF cutoff; rejects mic hiss & ultrasonic noise (3500–5000 Hz)
     speechSplitHz: 300,          // Worklet 1-pole split between low rumble (<300 Hz) and speech formants (>=300 Hz)
-    calibrationMs: 3000,         // Quick "Запам'ятати тишу" duration (ms)
+    calibrationMs: 3000,         // Quick "Remember silence" duration (ms)
     wizardSilenceMs: 4000,       // Setup wizard step-1 silence sampling duration (ms)
     voiceCheckMs: 4000,          // Setup wizard step-2 voice check window (ms)
     calibrationPercentile: 0.20, // Lower percentile for baseline floor (ignores coughs/clicks during calibration)
@@ -14,7 +14,7 @@ export const CONFIG = {
     thresholdFloorDb: -70,       // Minimum effective floor (protects against digital-zero noise-gate headsets)
     hotFloorDb: -25,             // Floor above this warns that OS mic gain is overloaded
     newNoiseDb: 6,               // Steady floor rise (+dB) required to start counting toward recalibration hint
-    newNoiseSec: 60,             // Seconds of sustained stationary noise before pulsing "Запам'ятати тишу"
+    newNoiseSec: 60,             // Seconds of sustained stationary noise before pulsing "Remember silence"
     stationarySpreadDb: 7,       // Max p85-p15 spread (dB) considered stationary hum (projector/AC) vs speech
     smoothingAttack: 0.04,       // Visual envelope rise tau (s); fast so HUD & balls feel alive
     smoothingRelease: 0.35,      // Visual envelope fall tau (s); smooth so bar doesn't flicker

@@ -21,11 +21,11 @@ import { openPopover, closePopover, escapeHtml } from './popover.js';
 const TIMER_MINUTES = [1, 2, 3, 5, 10, 15, 20];
 const MAX_TIMER_MINUTES = 90;
 
-const ZONE_LABELS = {
-  green: 'Тихо',
-  yellow: 'Шепіт',
-  red: 'Шумно!',
-};
+function zoneLabel(zone) {
+  if (zone === 'red') return t('zoneRed');
+  if (zone === 'yellow') return t('zoneYellow');
+  return t('zoneGreen');
+}
 
 export class HUD {
   /**
@@ -42,41 +42,52 @@ export class HUD {
     this.callbacks = callbacks;
     this.container = document.createElement('div');
     this.container.className = 'hud-container';
+    this.ringCircumference = 2 * Math.PI * 23;
+    this.alertTimer = null;
+
+    document.body.appendChild(this.container);
+    this.render();
+  }
+
+  render() {
+    const activeMode = this.modeControl?.querySelector('.hud-mode-tab.active')?.dataset.mode || 'quiet';
+    const classNameText = this.jarClassLabel?.textContent || '';
+    const classColor = this.jarClassLabel?.style.getPropertyValue('--class-color') || '';
 
     this.container.innerHTML = `
       <!-- Top Bar in TV Safe Area -->
       <div class="hud-top">
         <!-- Left: Noise Traffic Light -->
         <div class="hud-left">
-          <div class="traffic-light-meter liquid-glass-surface" id="traffic-light" title="Зелений — тихо, жовтий — шепіт, червоний — шумно">
-            <div class="traffic-light-pod" aria-label="Світлофор">
-              <div class="light-dot red" title="Шум (червона зона)">
+          <div class="traffic-light-meter liquid-glass-surface" id="traffic-light" title="${escapeHtml(t('trafficLightTitle'))}">
+            <div class="traffic-light-pod" aria-label="${escapeHtml(t('trafficLightAria'))}">
+              <div class="light-dot red" title="${escapeHtml(t('dotRedTitle'))}">
                 <span class="light-glyph">!</span>
               </div>
-              <div class="light-dot yellow" title="Шепіт (жовта зона)">
+              <div class="light-dot yellow" title="${escapeHtml(t('dotYellowTitle'))}">
                 <span class="light-glyph">≈</span>
               </div>
-              <div class="light-dot green active" title="Тиша (зелена зона)">
+              <div class="light-dot green active" title="${escapeHtml(t('dotGreenTitle'))}">
                 <span class="light-glyph">✓</span>
               </div>
             </div>
             <div class="traffic-info">
-              <div class="traffic-subtext" id="traffic-subtext">У класі тихо</div>
-              <div class="traffic-label zone-green" id="traffic-label">Тихо</div>
-              <div class="sound-meter-wrap" id="sound-meter-wrap" title="Рівень шуму в класі">
+              <div class="traffic-subtext" id="traffic-subtext">${escapeHtml(t('subtextQuiet'))}</div>
+              <div class="traffic-label zone-green" id="traffic-label">${escapeHtml(t('zoneGreen'))}</div>
+              <div class="sound-meter-wrap" id="sound-meter-wrap" title="${escapeHtml(t('soundMeterTitle'))}">
                 <div class="meter-zones-bg">
                   <span class="meter-zone-track green-track"></span>
                   <span class="meter-zone-track yellow-track"></span>
                   <span class="meter-zone-track red-track"></span>
                 </div>
-                <div class="meter-threshold-tick yellow-tick" title="Поріг жовтої зони (шепіт)"></div>
-                <div class="meter-threshold-tick red-tick" title="Поріг червоної зони (шум)"></div>
+                <div class="meter-threshold-tick yellow-tick" title="${escapeHtml(t('yellowTickTitle'))}"></div>
+                <div class="meter-threshold-tick red-tick" title="${escapeHtml(t('redTickTitle'))}"></div>
                 <div class="db-bar" id="db-bar">
                   <span class="db-bar-lead"></span>
                 </div>
               </div>
             </div>
-            <button class="hud-icon-btn cal-quick-btn" id="cal-quick-btn" title="Запам'ятати тишу в класі (3 с)">
+            <button class="hud-icon-btn cal-quick-btn" id="cal-quick-btn" title="${escapeHtml(t('calQuickTitle'))}">
               ${iconCalibrate()}
             </button>
           </div>
@@ -85,27 +96,27 @@ export class HUD {
         <!-- Center: Interactive Liquid Glass Mode Switcher & Timer -->
         <div class="hud-center">
           <div class="mode-segmented-control liquid-glass-pillbar" id="hud-mode-control">
-            <button class="hud-mode-tab liquid-glass-tab active" data-mode="quiet" title="Найсуворіше. Зірки за тишу (клавіша 1)">
-              ${iconModeQuiet()}<span>Тиха робота</span>
+            <button class="hud-mode-tab liquid-glass-tab ${activeMode === 'quiet' ? 'active' : ''}" data-mode="quiet" title="${escapeHtml(t('modeQuietTitle'))}">
+              ${iconModeQuiet()}<span>${escapeHtml(t('modeQuietShort'))}</span>
             </button>
-            <button class="hud-mode-tab liquid-glass-tab" data-mode="groups" title="Можна говорити впівголоса. Зірки теж є (клавіша 2)">
-              ${iconModeGroups()}<span>Групи</span>
+            <button class="hud-mode-tab liquid-glass-tab ${activeMode === 'groups' ? 'active' : ''}" data-mode="groups" title="${escapeHtml(t('modeGroupsTitle'))}">
+              ${iconModeGroups()}<span>${escapeHtml(t('modeGroupsShort'))}</span>
             </button>
-            <button class="hud-mode-tab liquid-glass-tab" data-mode="breaktime" title="Кульки стрибають від голосу. Без зірок (клавіша 3)">
-              ${iconModeBreak()}<span>Перерва</span>
+            <button class="hud-mode-tab liquid-glass-tab ${activeMode === 'breaktime' ? 'active' : ''}" data-mode="breaktime" title="${escapeHtml(t('modeBreakTitle'))}">
+              ${iconModeBreak()}<span>${escapeHtml(t('modeBreakShort'))}</span>
             </button>
           </div>
 
-          <button class="hud-timer-btn liquid-glass-surface" id="hud-timer-btn" title="Таймер завдання">
-            ${iconTimer()}<span>Таймер</span>
+          <button class="hud-timer-btn liquid-glass-surface" id="hud-timer-btn" title="${escapeHtml(t('timerTitle'))}">
+            ${iconTimer()}<span>${escapeHtml(t('timerBtn'))}</span>
           </button>
 
           <div class="timer-display liquid-glass-surface hidden" id="timer-display">
             <span class="timer-digits" id="timer-digits">05:00</span>
-            <button class="timer-btn" id="timer-toggle-btn" title="Пауза / продовжити (T)">
+            <button class="timer-btn" id="timer-toggle-btn" title="${escapeHtml(t('timerPauseTitle'))}">
               ${iconPause()}
             </button>
-            <button class="timer-btn" id="timer-cancel-btn" title="Зупинити таймер">
+            <button class="timer-btn" id="timer-cancel-btn" title="${escapeHtml(t('timerStopTitle'))}">
               ${iconClose()}
             </button>
           </div>
@@ -113,7 +124,7 @@ export class HUD {
 
         <!-- Right: Glass Star Jar & Settings Toggle -->
         <div class="hud-right">
-          <div class="star-jar-widget liquid-glass-surface" id="star-jar-widget" title="Банка зірок">
+          <div class="star-jar-widget liquid-glass-surface" id="star-jar-widget" title="${escapeHtml(t('starJarTitle'))}">
             <div class="jar-ring-container">
               <svg class="star-progress-ring" viewBox="0 0 54 54">
                 <circle class="ring-bg" cx="27" cy="27" r="23"></circle>
@@ -128,11 +139,11 @@ export class HUD {
               <div class="star-count-badge" id="star-count">
                 ${iconStar(true)} <span id="star-numbers">0/20</span>
               </div>
-              <div class="jar-reward-label" id="jar-reward-label">5 хв мультика</div>
+              <div class="jar-reward-label" id="jar-reward-label">${escapeHtml(t('defaultReward'))}</div>
             </div>
           </div>
 
-          <button class="panel-toggle-btn liquid-glass-surface" id="panel-toggle-btn" title="Налаштування: мікрофон, звук, кульки (H)">
+          <button class="panel-toggle-btn liquid-glass-surface" id="panel-toggle-btn" title="${escapeHtml(t('panelToggleTitle'))}">
             ${iconGear()}
           </button>
         </div>
@@ -146,12 +157,12 @@ export class HUD {
 
       <!-- Large Alert Banner -->
       <div class="alert-banner hidden" id="alert-banner">
-        <h2 id="alert-text">${t('shush')}</h2>
+        <h2 id="alert-text">${escapeHtml(t('shush'))}</h2>
       </div>
 
       <!-- Golden Combo Banner -->
       <div class="golden-banner hidden" id="golden-banner">
-        <span>${t('goldenCombo')}</span>
+        <span>${escapeHtml(t('goldenCombo'))}</span>
       </div>
 
       <!-- Microphone Permission Blocked Help Toast -->
@@ -159,8 +170,8 @@ export class HUD {
         <div class="toast-content">
           <span class="toast-icon">${iconLock()}</span>
           <div class="toast-text">
-            <strong>Доступ до мікрофона заблоковано</strong>
-            <p>Натисніть на значок замка в адресному рядку браузера та оберіть «Дозволити мікрофон».</p>
+            <strong>${escapeHtml(t('micBlockedTitle'))}</strong>
+            <p>${escapeHtml(t('micBlockedBody'))}</p>
           </div>
         </div>
         <button class="toast-close-btn" id="toast-close-btn">${iconClose()}</button>
@@ -169,22 +180,20 @@ export class HUD {
       <!-- Goal Achieved Modal -->
       <div class="goal-modal-overlay hidden" id="goal-modal">
         <div class="goal-modal-card">
-          <h2>Ціль досягнуто!</h2>
-          <p class="goal-modal-subtitle">Заслужена нагорода:</p>
-          <div class="goal-modal-reward" id="goal-modal-reward">${iconGift()} <span>5 хв мультика</span></div>
+          <h2>${escapeHtml(t('goalReachedTitle'))}</h2>
+          <p class="goal-modal-subtitle">${escapeHtml(t('goalReachedSubtitle'))}</p>
+          <div class="goal-modal-reward" id="goal-modal-reward">${iconGift()} <span>${escapeHtml(t('defaultReward'))}</span></div>
           <div class="goal-modal-actions">
             <button class="goal-action-btn primary" id="btn-goal-reset">
-              ${iconReset()} Нова ціль
+              ${iconReset()} ${escapeHtml(t('goalResetBtn'))}
             </button>
             <button class="goal-action-btn secondary" id="btn-goal-close">
-              Закрити
+              ${escapeHtml(t('closeBtn'))}
             </button>
           </div>
         </div>
       </div>
     `;
-
-    document.body.appendChild(this.container);
 
     // Elements
     this.dotGreen = this.container.querySelector('.light-dot.green');
@@ -201,6 +210,7 @@ export class HUD {
     this.bigTimerFill = this.container.querySelector('#big-timer-fill');
     this.lastTrafficText = '';
     this.lastTrafficSubtext = '';
+    this.lastTimerState = null;
     this.modeControl = this.container.querySelector('#hud-mode-control');
     this.timerDisplay = this.container.querySelector('#timer-display');
     this.timerDigits = this.container.querySelector('#timer-digits');
@@ -218,13 +228,14 @@ export class HUD {
     this.goalModal = this.container.querySelector('#goal-modal');
     this.goalModalReward = this.container.querySelector('#goal-modal-reward');
 
-    this.alertTimer = null;
     this.alertPhrases = [t('shush'), t('quietPlease'), t('tooNoisy')];
 
-    // SVG Ring circumference: 2 * PI * 23 ≈ 144.5
-    this.ringCircumference = 2 * Math.PI * 23;
     this.starRingFill.style.strokeDasharray = `${this.ringCircumference} ${this.ringCircumference}`;
     this.starRingFill.style.strokeDashoffset = this.ringCircumference;
+
+    if (classNameText) {
+      this.setClassName(classNameText, classColor);
+    }
 
     this.bindEvents();
   }
@@ -238,19 +249,19 @@ export class HUD {
     openPopover({
       anchor: this.timerBtn,
       side: 'below',
-      title: 'Таймер завдання',
+      title: t('timerTitle'),
       width: 300,
       html: `
         <div class="timer-chips">
-          ${TIMER_MINUTES.map((m) => `<button class="chip-btn" data-min="${m}">${m} хв</button>`).join('')}
+          ${TIMER_MINUTES.map((m) => `<button class="chip-btn" data-min="${m}">${m} ${t('timerMinUnit')}</button>`).join('')}
         </div>
         <form class="timer-custom" id="timer-custom">
-          <span class="field-label">Свій час:</span>
+          <span class="field-label">${t('timerCustomLabel')}</span>
           <input type="number" class="num-input" id="timer-custom-min" min="1" max="${MAX_TIMER_MINUTES}" value="7" inputmode="numeric">
-          <span class="field-label">хв</span>
-          <button type="submit" class="action-btn">Старт</button>
+          <span class="field-label">${t('timerMinUnit')}</span>
+          <button type="submit" class="action-btn">${t('timerStartBtn')}</button>
         </form>
-        <p class="popover-note">Коли час вийде, класу зарахується виконане завдання. Якщо весь час було тихо — ще й бонусна зірка.</p>
+        <p class="popover-note">${t('timerNote')}</p>
       `,
       onMount: (el) => {
         el.querySelectorAll('[data-min]').forEach((btn) => {
@@ -323,7 +334,7 @@ export class HUD {
       ? Math.round(calProgress * 100)
       : Math.min(100, Math.round((progress / 1.5) * 100));
 
-    const labelText = isCalibrating ? 'Слухаю тишу…' : ZONE_LABELS[zone] || ZONE_LABELS.green;
+    const labelText = isCalibrating ? t('labelCalibrating') : zoneLabel(zone);
     if (labelText !== this.lastTrafficText) {
       this.lastTrafficText = labelText;
       this.trafficLabel.textContent = labelText;
@@ -337,20 +348,20 @@ export class HUD {
     let subtext = '';
     let subtextMode = 'normal';
     if (isCalibrating) {
-      subtext = 'Запам\'ятовую тишу…';
+      subtext = t('subtextCalibrating');
       subtextMode = 'calibrating';
     } else if (zone === 'red') {
-      subtext = 'Занадто шумно!';
+      subtext = t('subtextRed');
       subtextMode = 'alert';
     } else if (zone === 'yellow') {
-      subtext = 'Тихше, будь ласка!';
+      subtext = t('subtextYellow');
       subtextMode = 'warn';
     } else if (progress >= 0.35) {
       // Early warning while still technically in the green zone
-      subtext = 'Шум зростає…';
+      subtext = t('subtextRising');
       subtextMode = 'rising';
     } else {
-      subtext = 'У класі тихо';
+      subtext = t('subtextQuiet');
       subtextMode = 'quiet';
     }
 
@@ -460,7 +471,7 @@ export class HUD {
   showGoalReachedModal(rewardText, onResetGoal = null) {
     if (onResetGoal) this.callbacks.onResetGoal = onResetGoal;
     closePopover();
-    this.goalModalReward.innerHTML = `${iconGift()} <span>${escapeHtml(rewardText || 'Нагорода')}</span>`;
+    this.goalModalReward.innerHTML = `${iconGift()} <span>${escapeHtml(rewardText || t('rewardFallback'))}</span>`;
     this.goalModal.classList.remove('hidden');
   }
 
@@ -473,13 +484,13 @@ export class HUD {
    */
   showBackgroundAudioPausedToast() {
     this.showMicStatusToast(
-      'Фоновий запис призупинявся',
-      'Цей браузер або режим економії заряду зупиняє мікрофон на згорнутій вкладці.'
+      t('bgAudioPausedTitle'),
+      t('bgAudioPausedBody')
     );
   }
 
   /**
-   * Brief plain-Ukrainian notice for microphone disconnect/reconnect or background audio pause.
+   * Brief localized notice for microphone disconnect/reconnect or background audio pause.
    * @param {string} title
    * @param {string} detail
    */
@@ -491,7 +502,7 @@ export class HUD {
     toast.innerHTML = `
       <span class="bg-paused-toast-icon">${iconMic(false)}</span>
       <span class="update-toast-text"><strong>${escapeHtml(title)}</strong> ${escapeHtml(detail)}</span>
-      <button class="update-toast-close" type="button" aria-label="Закрити">${iconClose()}</button>
+      <button class="update-toast-close" type="button" aria-label="${escapeHtml(t('closeBtn'))}">${iconClose()}</button>
     `;
     const timer = setTimeout(() => toast.remove(), 9000);
     toast.querySelector('.update-toast-close')?.addEventListener('click', () => {

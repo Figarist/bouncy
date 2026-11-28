@@ -6,6 +6,7 @@ import {
   getAllCustomSounds,
   putCustomSoundRecord,
 } from '../audio/sound-library.js';
+import { t } from '../ui/i18n.js';
 
 const STORAGE_KEY = 'tyhyi-klas:v1';
 const SNAPSHOTS_KEY = 'tyhyi-klas:snapshots';
@@ -37,7 +38,7 @@ export function createClassRecord(overrides = {}) {
   return {
     stars: 0,
     goal: 20,
-    reward: '5 хв мультика',
+    reward: t('defaultReward'),
     color: CLASS_COLORS[0],
     secondsPerStar: STAR_SPEEDS[0],
     totalStars: 0,
@@ -247,7 +248,7 @@ function normalizeClassRecord(v, index) {
   return createClassRecord({
     stars,
     goal: clamp(Math.round(finite(r.goal, 20)), 3, 200),
-    reward: typeof r.reward === 'string' ? r.reward : '5 хв мультика',
+    reward: typeof r.reward === 'string' ? r.reward : t('defaultReward'),
     color: /^#[0-9a-f]{6}$/i.test(r.color) ? r.color : CLASS_COLORS[index % CLASS_COLORS.length],
     secondsPerStar: STAR_SPEEDS.includes(r.secondsPerStar) ? r.secondsPerStar : STAR_SPEEDS[0],
     totalStars: Math.max(count(r.totalStars), stars),
@@ -286,13 +287,19 @@ export function normalizeState(raw) {
 
 export class StorageManager {
   static load() {
+    const freshDefault = () => {
+      const copy = JSON.parse(JSON.stringify(DEFAULT_STATE));
+      if (copy.classes['4-Б']) copy.classes['4-Б'].reward = t('defaultReward');
+      if (copy.classes['3-А']) copy.classes['3-А'].reward = t('defaultRewardBoardGame');
+      return copy;
+    };
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return JSON.parse(JSON.stringify(DEFAULT_STATE));
+      if (!raw) return freshDefault();
       const parsed = JSON.parse(raw);
-      return normalizeState(parsed) || normalizeState({ ...DEFAULT_STATE, settings: parsed?.settings });
+      return normalizeState(parsed) || normalizeState({ ...freshDefault(), settings: parsed?.settings });
     } catch {
-      return JSON.parse(JSON.stringify(DEFAULT_STATE));
+      return freshDefault();
     }
   }
 
@@ -323,7 +330,7 @@ export class StorageManager {
     }
   }
 
-  static takeSnapshot(state, label = 'Авто-збереження') {
+  static takeSnapshot(state, label = t('backupAutoSaveDefault')) {
     if (!state || !state.classes) return null;
     try {
       const snapshots = this.getSnapshots();
@@ -359,7 +366,7 @@ export class StorageManager {
     if (!restored) return null;
 
     // Safety snapshot of current state before rolling back; don't overwrite anything without it
-    if (!this.takeSnapshot(this.load(), 'Перед відновленням копії')) return null;
+    if (!this.takeSnapshot(this.load(), t('snapBeforeRestore'))) return null;
 
     this.save(restored);
     return restored;
@@ -406,7 +413,7 @@ export class StorageManager {
       const parsed = typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
       const nextState = normalizeState(parsed?.state || parsed);
       if (!nextState) {
-        return { success: false, error: 'Файл не містить дійсних даних класів «Тихого класу»' };
+        return { success: false, error: t('importErrInvalid') };
       }
 
       // Restore custom sounds asynchronously if present
@@ -424,7 +431,7 @@ export class StorageManager {
                 const buffer = base64ToBuffer(item.wavBase64);
                 await putCustomSoundRecord({
                   id: item.id,
-                  name: item.name || 'Свій звук',
+                  name: item.name || t('customSoundDefault'),
                   addedAt: item.addedAt,
                   wav: buffer,
                 });
@@ -437,16 +444,16 @@ export class StorageManager {
       }
 
       // Take safety backup of current state first; refuse to import if it couldn't be stored
-      if (!this.takeSnapshot(this.load(), 'Перед імпортом файлу')) {
-        return { success: false, error: 'Браузер не дав зберегти страхувальну копію. Звільніть місце і спробуйте ще раз.' };
+      if (!this.takeSnapshot(this.load(), t('snapBeforeImport'))) {
+        return { success: false, error: t('importErrNoSpaceSafety') };
       }
 
       if (!this.save(nextState)) {
-        return { success: false, error: 'Браузер не дав зберегти дані (немає місця).' };
+        return { success: false, error: t('importErrNoSpaceSave') };
       }
       return { success: true, state: nextState };
     } catch (err) {
-      return { success: false, error: `Помилка читання файлу: ${err.message}` };
+      return { success: false, error: t('importErrRead', { message: err.message }) };
     }
   }
 

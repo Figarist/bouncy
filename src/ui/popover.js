@@ -1,4 +1,5 @@
 import { iconClose } from './icons.js';
+import { t } from './i18n.js';
 
 /**
  * Lightweight floating popover used by the class sidebar and the teacher panel.
@@ -49,7 +50,7 @@ export function openPopover({ anchor, title, html, side = 'right', onMount, onCl
   el.innerHTML = `
     <div class="popover-header">
       <h3>${escapeHtml(title)}</h3>
-      <button class="popover-close" type="button" title="Закрити (Esc)">${iconClose()}</button>
+      <button class="popover-close" type="button" title="${escapeHtml(t('closeEsc'))}">${iconClose()}</button>
     </div>
     <div class="popover-body">${html}</div>
   `;

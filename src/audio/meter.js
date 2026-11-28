@@ -167,6 +167,8 @@ export function evaluateLevel(
   };
 }
 
+import { t } from '../ui/i18n.js';
+
 /**
  * Automatically computes suggested sensitivity based on calibrated floor and detected voice level.
  * @param {number} floorDb Ambient silence level in dBFS
@@ -199,23 +201,23 @@ export function sensitivityVerdict({ currentDb, ambientDb, yellowDb, redDb, curr
   if (effectiveZone === 'red') {
     return {
       status: 'too-loud',
-      text: 'Занадто чутливо — світлофор червоний! Посуньте повзунок ліворуч (до «Спокійно»).',
+      text: t('verdictTooLoud'),
     };
   }
   if (effectiveZone === 'yellow') {
     return {
       status: 'warning',
-      text: 'У класі чути шепіт або фоновий шум. Посуньте повзунок ліворуч або натисніть «Запам\'ятати тишу».',
+      text: t('verdictWarning'),
     };
   }
   if (recentMaxZone === 'red' || recentMaxZone === 'yellow') {
     return {
       status: 'good',
-      text: 'Працює чудово: голос вмикає світлофор, а в тиші він спокійний.',
+      text: t('verdictGood'),
     };
   }
   return {
     status: 'idle',
-    text: 'Зараз тихо — світлофор зелений. Скажіть щось уголос, щоб перевірити.',
+    text: t('verdictIdle'),
   };
 }

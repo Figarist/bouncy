@@ -3114,3 +3114,16 @@ body.light-room .big-timer-digits {
   font-size: 14px;
   line-height: 1.5;
 }
+
+.intro-lang-bar {
+  align-self: center;
+  margin-bottom: 10px;
+}
+
+.list-row-lang {
+  cursor: default;
+}
+
+.lang-pillbar {
+  flex-shrink: 0;
+}

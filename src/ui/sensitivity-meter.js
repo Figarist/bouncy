@@ -1,9 +1,10 @@
 import { sensitivityVerdict } from '../audio/meter.js';
+import { t } from './i18n.js';
 
 export function sensitivityLabel(val) {
-  if (val === 0) return 'Звичайно (0)';
-  if (val > 0) return `Чутливо (+${val})`;
-  return `Спокійно (${val})`;
+  if (val === 0) return t('sensNormal');
+  if (val > 0) return t('sensSensitive', { val });
+  return t('sensCalm', { val });
 }
 
 export class SensitivityMeter {
@@ -11,11 +12,13 @@ export class SensitivityMeter {
    * @param {object} options
    * @param {number} options.sensitivity Initial sensitivity value (-15 to +15)
    * @param {string} [options.title] Custom title
+   * @param {string} [options.titleKey] Translation key for title
    * @param {Function} options.onChange Callback(val)
    */
-  constructor({ sensitivity = 0, title = 'Чутливість до шуму', onChange = null }) {
+  constructor({ sensitivity = 0, title = null, titleKey = 'sensTitle', onChange = null }) {
     this.sensitivity = sensitivity;
     this.title = title;
+    this.titleKey = titleKey;
     this.onChange = onChange;
 
     this.container = document.createElement('div');
@@ -28,16 +31,17 @@ export class SensitivityMeter {
   }
 
   render() {
+    const titleText = this.title || t(this.titleKey);
     this.container.innerHTML = `
       <div class="slider-header">
-        <span class="panel-card-title">${this.title}</span>
+        <span class="panel-card-title">${titleText}</span>
         <span class="slider-val" id="sm-val">${sensitivityLabel(this.sensitivity)}</span>
       </div>
       <input type="range" class="slider" id="sm-slider" min="-25" max="25" step="1" value="${this.sensitivity}">
       <div class="slider-hints">
-        <span>Спокійно (−25)</span>
-        <span>Звичайно (0)</span>
-        <span>Чутливо (+25)</span>
+        <span>${t('sensHintCalm')}</span>
+        <span>${t('sensHintNormal')}</span>
+        <span>${t('sensHintSensitive')}</span>
       </div>
 
       <div class="sm-live-bar-wrap">
@@ -50,14 +54,14 @@ export class SensitivityMeter {
           </div>
         </div>
         <div class="sm-bar-legend">
-          <span>Тиша</span>
-          <span>Шепіт</span>
-          <span>Розмова / Крик</span>
+          <span>${t('sensBarQuiet')}</span>
+          <span>${t('sensBarWhisper')}</span>
+          <span>${t('sensBarTalk')}</span>
         </div>
       </div>
 
       <div class="sm-verdict-box idle" id="sm-verdict">
-        <span class="sm-verdict-text" id="sm-verdict-text">Зараз тихо — світлофор зелений. Скажіть щось, щоб перевірити.</span>
+        <span class="sm-verdict-text" id="sm-verdict-text">${t('sensVerdictInitial')}</span>
       </div>
     `;
 
@@ -106,7 +110,7 @@ export class SensitivityMeter {
       if (this.elPin) this.elPin.style.left = '0%';
       if (this.elVerdict) this.elVerdict.className = 'sm-verdict-box idle';
       if (this.elVerdictText) {
-        this.elVerdictText.textContent = 'Мікрофон вимкнено. Увімкніть його, щоб перевірити звук.';
+        this.elVerdictText.textContent = t('sensVerdictMicOff');
       }
       return;
     }

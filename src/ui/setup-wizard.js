@@ -2,6 +2,7 @@ import { iconCheck, iconClose, iconMic, iconCalibrate } from './icons.js';
 import { SensitivityMeter } from './sensitivity-meter.js';
 import { suggestSensitivity } from '../audio/meter.js';
 import { CONFIG } from '../config.js';
+import { t } from './i18n.js';
 
 export class SetupWizard {
   /**
@@ -32,7 +33,7 @@ export class SetupWizard {
 
     this.sensitivityWidget = new SensitivityMeter({
       sensitivity: this.sensitivity,
-      title: 'Підібрана чутливість',
+      titleKey: 'sensTunedTitle',
       onChange: (val) => {
         this.sensitivity = val;
         if (this.onSensitivityChange) this.onSensitivityChange(val);
@@ -91,8 +92,8 @@ export class SetupWizard {
             <span class="step-line" id="line-2"></span>
             <span class="step-dot" id="dot-3">3</span>
           </div>
-          <button class="wizard-skip-btn" id="btn-skip" title="Пропустити">
-            Пропустити ${iconClose()}
+          <button class="wizard-skip-btn" id="btn-skip" title="${t('wizardSkip')}">
+            ${t('wizardSkip')} ${iconClose()}
           </button>
         </div>
 
@@ -132,13 +133,13 @@ export class SetupWizard {
         <div class="wizard-icon-stage warning">
           ${iconMic(false)}
         </div>
-        <h2 class="wizard-title">Мікрофон вимкнено</h2>
+        <h2 class="wizard-title">${t('wizardMicOffTitle')}</h2>
         <p class="wizard-subtitle">
-          Для налаштування потрібен доступ до мікрофона. Будь ласка, увімкніть його або надайте дозвіл у браузері.
+          ${t('wizardMicOffSub')}
         </p>
         <div class="wizard-actions">
           <button class="action-btn primary large" id="btn-retry-mic">
-            ${iconMic(true)} <span>Увімкнути мікрофон</span>
+            ${iconMic(true)} <span>${t('wizardRetryMic')}</span>
           </button>
         </div>
       </div>
@@ -175,14 +176,14 @@ export class SetupWizard {
         <div class="wizard-icon-stage">
           ${iconCalibrate()}
         </div>
-        <h2 class="wizard-title">1. Вимірювання тиші в кабінеті</h2>
+        <h2 class="wizard-title">${t('wizardStep1Title')}</h2>
         <p class="wizard-subtitle">
-          Попросіть клас помовчати 4 секунди. Коли в кабінеті стане тихо, натисніть кнопку нижче:
+          ${t('wizardStep1Sub')}
         </p>
 
         <div class="wizard-actions">
           <button class="action-btn primary large" id="btn-start-silence">
-            ${iconCalibrate()} <span>Почати вимірювання (4 с)</span>
+            ${iconCalibrate()} <span>${t('wizardStep1Btn')}</span>
           </button>
         </div>
       </div>
@@ -205,9 +206,9 @@ export class SetupWizard {
         <div class="wizard-icon-stage">
           ${iconCalibrate()}
         </div>
-        <h2 class="wizard-title">Слухаю тишу в кабінеті…</h2>
+        <h2 class="wizard-title">${t('wizardStep1Listening')}</h2>
         <p class="wizard-subtitle">
-          Тиша в класі. Програма запам'ятовує фоновий шум кабінету.
+          ${t('wizardStep1ListeningSub')}
         </p>
 
         <div class="wizard-countdown-wrap">
@@ -220,7 +221,7 @@ export class SetupWizard {
 
         <div class="wizard-actions">
           <button class="action-btn secondary" id="btn-cancel-silence">
-            <span>Скасувати</span>
+            <span>${t('wizardCancel')}</span>
           </button>
         </div>
       </div>
@@ -244,16 +245,16 @@ export class SetupWizard {
           <div class="wizard-icon-stage warning">
             ${iconCalibrate()}
           </div>
-          <h2 class="wizard-title">У кабінеті було трохи шумно</h2>
+          <h2 class="wizard-title">${t('wizardStep1NoisyTitle')}</h2>
           <p class="wizard-subtitle">
-            Зафіксовано коливання звуку. Можна повторити в тиші або продовжити далі, якщо це постійний гул проектора чи ПК.
+            ${t('wizardStep1NoisySub')}
           </p>
           <div class="wizard-actions">
             <button class="action-btn" id="btn-retry-silence">
-              ${iconCalibrate()} <span>Спробувати ще раз</span>
+              ${iconCalibrate()} <span>${t('wizardRetryBtn')}</span>
             </button>
             <button class="action-btn secondary" id="btn-ignore-silence">
-              <span>Все одно далі →</span>
+              <span>${t('wizardStep1IgnoreBtn')}</span>
             </button>
           </div>
         </div>
@@ -272,13 +273,13 @@ export class SetupWizard {
         <div class="wizard-icon-stage success">
           ${iconCheck()}
         </div>
-        <h2 class="wizard-title">Тишу збережено!</h2>
+        <h2 class="wizard-title">${t('wizardStep1DoneTitle')}</h2>
         <p class="wizard-subtitle">
-          Фоновий рівень кабінету зафіксовано: <b>${Math.round(this.calibratedFloor)} dB</b>.
+          ${t('wizardStep1DoneSub', { db: Math.round(this.calibratedFloor) })}
         </p>
         <div class="wizard-actions">
           <button class="action-btn primary large" id="btn-next-step2">
-            <span>Наступний крок: Голос →</span>
+            <span>${t('wizardNextStep2Btn')}</span>
           </button>
         </div>
       </div>
@@ -307,18 +308,18 @@ export class SetupWizard {
         <div class="wizard-icon-stage">
           ${iconMic(true)}
         </div>
-        <h2 class="wizard-title">2. Перевірка вашого голосу</h2>
+        <h2 class="wizard-title">${t('wizardStep2Title')}</h2>
         <p class="wizard-subtitle">
-          Коли будете готові, натисніть кнопку і скажіть звичайним голосом для уроку:
+          ${t('wizardStep2Sub')}
         </p>
-        <div class="wizard-voice-phrase">«Добрий день, діти!»</div>
+        <div class="wizard-voice-phrase">${t('wizardVoicePhrase')}</div>
 
         <div class="wizard-actions">
           <button class="action-btn primary large" id="btn-start-voice">
-            ${iconMic(true)} <span>Записати голос (4 с)</span>
+            ${iconMic(true)} <span>${t('wizardStep2Btn')}</span>
           </button>
           <button class="action-btn secondary" id="btn-skip-voice">
-            <span>Пропустити цей крок</span>
+            <span>${t('wizardSkipStepBtn')}</span>
           </button>
         </div>
       </div>
@@ -344,19 +345,19 @@ export class SetupWizard {
         <div class="wizard-icon-stage">
           ${iconMic(true)}
         </div>
-        <h2 class="wizard-title">Говоріть зараз…</h2>
-        <div class="wizard-voice-phrase">«Добрий день, діти!»</div>
+        <h2 class="wizard-title">${t('wizardStep2Listening')}</h2>
+        <div class="wizard-voice-phrase">${t('wizardVoicePhrase')}</div>
 
         <div class="wizard-voice-vu-wrap">
           <div class="wizard-voice-vu-bar">
             <div class="wizard-voice-vu-fill" id="voice-vu-fill"></div>
           </div>
-          <div class="wizard-voice-status" id="voice-status">Слухаю ваш голос…</div>
+          <div class="wizard-voice-status" id="voice-status">${t('wizardVoiceStatus')}</div>
         </div>
 
         <div class="wizard-actions">
           <button class="action-btn secondary" id="btn-cancel-voice">
-            <span>Скасувати</span>
+            <span>${t('wizardCancel')}</span>
           </button>
         </div>
       </div>
@@ -380,16 +381,16 @@ export class SetupWizard {
           <div class="wizard-icon-stage warning">
             ${iconMic(true)}
           </div>
-          <h2 class="wizard-title">Голос майже не чути</h2>
+          <h2 class="wizard-title">${t('wizardStep2QuietTitle')}</h2>
           <p class="wizard-subtitle">
-            Мікрофон не вловив виразного голосу. Спробуйте сказати трохи голосніше або продовжте зі стандартною чутливістю.
+            ${t('wizardStep2QuietSub')}
           </p>
           <div class="wizard-actions">
             <button class="action-btn" id="btn-retry-voice">
-              ${iconMic(true)} <span>Спробувати ще раз</span>
+              ${iconMic(true)} <span>${t('wizardRetryBtn')}</span>
             </button>
             <button class="action-btn secondary" id="btn-continue-voice">
-              <span>Далі як є →</span>
+              <span>${t('wizardContinueAsIs')}</span>
             </button>
           </div>
         </div>
@@ -414,13 +415,13 @@ export class SetupWizard {
         <div class="wizard-icon-stage success">
           ${iconCheck()}
         </div>
-        <h2 class="wizard-title">Голос зафіксовано!</h2>
+        <h2 class="wizard-title">${t('wizardStep2DoneTitle')}</h2>
         <p class="wizard-subtitle">
-          Різниця з тишею кабінету: <b>+${Math.round(result.deltaDb)} dB</b>. Чутливість підібрано автоматично.
+          ${t('wizardStep2DoneSub', { db: Math.round(result.deltaDb) })}
         </p>
         <div class="wizard-actions">
           <button class="action-btn primary large" id="btn-next-step3">
-            <span>Наступний крок: Чутливість →</span>
+            <span>${t('wizardNextStep3Btn')}</span>
           </button>
         </div>
       </div>
@@ -452,16 +453,16 @@ export class SetupWizard {
         <div class="wizard-icon-stage success">
           ${iconCheck()}
         </div>
-        <h2 class="wizard-title">3. Усе налаштовано!</h2>
+        <h2 class="wizard-title">${t('wizardStep3Title')}</h2>
         <p class="wizard-subtitle">
-          Чутливість виставлено під ваш кабінет. Спробуйте пошепотіти чи сказати щось прямо зараз, щоб перевірити шкалу:
+          ${t('wizardStep3Sub')}
         </p>
 
         <div class="wizard-widget-mount" id="wizard-widget-mount"></div>
 
         <div class="wizard-actions">
           <button class="action-btn primary large" id="btn-finish-wizard">
-            ${iconCheck()} <span>Готово! Почати урок</span>
+            ${iconCheck()} <span>${t('wizardFinishBtn')}</span>
           </button>
         </div>
       </div>

@@ -9,6 +9,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "serve:test": "node scripts/serve-test.mjs",
+    "check:i18n": "node scripts/check-i18n.mjs",
     "test": "vitest run"
   },
   "devDependencies": {

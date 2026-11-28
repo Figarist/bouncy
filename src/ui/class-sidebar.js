@@ -14,13 +14,14 @@ import {
 import { openPopover, closePopover, getOpenPopover, escapeHtml } from './popover.js';
 import { MAX_CLASS_NAME_LENGTH, CLASS_COLORS, STAR_SPEEDS, BUILTIN_SOUNDS, rankClasses, classNames } from '../game/storage.js';
 import { listCustomSounds } from '../audio/sound-library.js';
+import { t, getLocale } from './i18n.js';
 
 const HISTORY_PREVIEW = 5;
 
 function formatDate(iso) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
-  return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}`;
+  return d.toLocaleDateString(getLocale(), { day: '2-digit', month: '2-digit' });
 }
 
 /**
@@ -212,12 +213,12 @@ export class ClassSidebar {
 
     this.el.innerHTML = `
       <div class="sidebar-head">
-        <span class="sidebar-title">${this.sortByStars ? 'Рейтинг класів' : 'Мої класи'}</span>
+        <span class="sidebar-title">${this.sortByStars ? t('sidebarLeaderboard') : t('sidebarMyClasses')}</span>
         <button class="sidebar-head-btn ${this.sortByStars ? 'active' : ''}" data-action="sort"
-          title="${this.sortByStars ? 'Повернути мій порядок (можна перетягувати)' : 'Показати рейтинг: хто зібрав найбільше зірок'}">
+          title="${escapeHtml(this.sortByStars ? t('sidebarSortManualTitle') : t('sidebarSortStarsTitle'))}">
           ${iconTrophy()}
         </button>
-        <button class="sidebar-head-btn" data-action="collapse" title="${this.collapsed ? 'Розгорнути список' : 'Згорнути список'}">
+        <button class="sidebar-head-btn" data-action="collapse" title="${escapeHtml(this.collapsed ? t('sidebarExpandTitle') : t('sidebarCollapseTitle'))}">
           ${iconChevron(this.collapsed ? 'right' : 'left')}
         </button>
       </div>
@@ -228,12 +229,12 @@ export class ClassSidebar {
 
       ${this.isAdding && !this.collapsed ? `
         <form class="sidebar-add-form">
-          <input type="text" class="text-input" id="sidebar-new-class" maxlength="${MAX_CLASS_NAME_LENGTH}" placeholder="Напр. 5-А або Роботи" autocomplete="off">
-          <button type="submit" class="sidebar-add-ok" title="Додати">${iconCheck()}</button>
+          <input type="text" class="text-input" id="sidebar-new-class" maxlength="${MAX_CLASS_NAME_LENGTH}" placeholder="${escapeHtml(t('sidebarAddPlaceholder'))}" autocomplete="off">
+          <button type="submit" class="sidebar-add-ok" title="${escapeHtml(t('sidebarAddOkTitle'))}">${iconCheck()}</button>
         </form>
       ` : `
-        <button class="sidebar-add-btn" data-action="add" title="Додати клас або гурток">
-          ${iconPlus()} <span>Додати</span>
+        <button class="sidebar-add-btn" data-action="add" title="${escapeHtml(t('sidebarAddBtnTitle'))}">
+          ${iconPlus()} <span>${t('sidebarAddBtn')}</span>
         </button>
       `}
     `;
@@ -269,22 +270,22 @@ export class ClassSidebar {
     const safe = escapeHtml(name);
     return `
       <div class="class-card ${isActive ? 'active' : ''} ${stars >= goal ? 'complete' : ''}" data-class="${safe}" style="--class-color:${escapeHtml(c.color)}">
-        ${this.sortByStars ? '' : `<span class="class-card-grip" title="Перетягніть, щоб змінити порядок">${iconGrip()}</span>`}
-        <button class="class-card-main" data-action="select" title="${isActive ? 'Активний клас' : `Перемкнути на ${safe}`}">
+        ${this.sortByStars ? '' : `<span class="class-card-grip" title="${escapeHtml(t('classDragTitle'))}">${iconGrip()}</span>`}
+        <button class="class-card-main" data-action="select" title="${isActive ? escapeHtml(t('classActiveTitle')) : escapeHtml(t('classSwitchTitle', { name }))}">
           <span class="class-card-top">
-            ${place ? `<span class="class-card-medal" title="${place} місце за зірками">${iconMedal(place)}</span>` : ''}
+            ${place ? `<span class="class-card-medal" title="${escapeHtml(t('classPlaceTitle', { place }))}">${iconMedal(place)}</span>` : ''}
             <span class="class-card-name">${safe}</span>
           </span>
           <span class="class-card-meter">
             <span class="class-card-progress"><span style="width:${pct}%"></span></span>
-            <span class="class-card-stars" title="Зірок у банці / ціль">${iconStar(true)}<b>${stars}</b><small>/${goal}</small></span>
+            <span class="class-card-stars" title="${escapeHtml(t('classStarsTitle'))}">${iconStar(true)}<b>${stars}</b><small>/${goal}</small></span>
           </span>
           <span class="class-card-bottom">
             <span class="class-card-reward">${iconGift()}<span>${escapeHtml(c.reward)}</span></span>
-            <span class="class-card-total" title="Зірок за весь час">${iconTrophy()}${c.totalStars || 0}</span>
+            <span class="class-card-total" title="${escapeHtml(t('classTotalStarsTitle'))}">${iconTrophy()}${c.totalStars || 0}</span>
           </span>
         </button>
-        <button class="class-card-edit" data-action="edit" title="Ціль, приз і статистика ${safe}">
+        <button class="class-card-edit" data-action="edit" title="${escapeHtml(t('classEditTitle', { name }))}">
           ${iconEdit()}
         </button>
       </div>
@@ -390,8 +391,8 @@ export class ClassSidebar {
     }
 
     const soundOptions = [
-      { id: '', title: 'Загальний (із налаштувань)' },
-      ...BUILTIN_SOUNDS.map((s) => ({ id: s.id, title: s.title })),
+      { id: '', title: t('classSoundGlobal') },
+      ...BUILTIN_SOUNDS.map((s) => ({ id: s.id, title: t(`sound_${s.id}`) })),
       ...customSounds.map((s) => ({ id: s.id, title: `★ ${s.name}` })),
     ];
 
@@ -399,27 +400,27 @@ export class ClassSidebar {
       // Edits re-render the sidebar, so look the card up again instead of holding the old node
       anchor: () => this.findCard(this.editingClass) || card,
       side: 'right',
-      title: 'Налаштування класу',
+      title: t('classEditorTitle'),
       width: 360,
       html: `
         <div class="field-row">
           <label class="field field-grow">
-            <span class="field-label">Назва</span>
+            <span class="field-label">${t('classNameLabel')}</span>
             <input type="text" class="text-input" id="ce-name" maxlength="${MAX_CLASS_NAME_LENGTH}" value="${escapeHtml(name)}">
           </label>
         </div>
 
         <div class="field">
-          <span class="field-label">Колір</span>
+          <span class="field-label">${t('classColorLabel')}</span>
           <div class="color-swatches">
             ${CLASS_COLORS.map((col) => `
-              <button type="button" class="color-swatch ${c.color === col ? 'active' : ''}" data-color="${col}" style="--swatch:${col}" title="Обрати колір"></button>
+              <button type="button" class="color-swatch ${c.color === col ? 'active' : ''}" data-color="${col}" style="--swatch:${col}" title="${escapeHtml(t('classColorPickTitle'))}"></button>
             `).join('')}
           </div>
         </div>
 
         <div class="field">
-          <span class="field-label">Окремий звук сигналу для цього класу</span>
+          <span class="field-label">${t('classSoundLabel')}</span>
           <div class="field-row">
             <select class="text-input field-grow" id="ce-sound">
               ${soundOptions
@@ -432,15 +433,15 @@ export class ClassSidebar {
                 )
                 .join('')}
             </select>
-            <button type="button" class="action-btn secondary" id="ce-test-sound" title="Прослухати обраний сигнал">
-              Прослухати
+            <button type="button" class="action-btn secondary" id="ce-test-sound" title="${escapeHtml(t('classTestSoundTitle'))}">
+              ${t('classTestSoundBtn')}
             </button>
           </div>
         </div>
 
         <div class="field-row">
           <label class="field">
-            <span class="field-label">Ціль (зірок)</span>
+            <span class="field-label">${t('classGoalLabel')}</span>
             <div class="stepper">
               <button type="button" class="stepper-btn" data-step="-5">−</button>
               <input type="number" class="num-input" id="ce-goal" min="3" max="200" value="${c.goal}">
@@ -448,17 +449,17 @@ export class ClassSidebar {
             </div>
           </label>
           <label class="field field-grow">
-            <span class="field-label">Приз</span>
-            <input type="text" class="text-input" id="ce-reward" maxlength="40" value="${escapeHtml(c.reward)}" placeholder="5 хв мультика">
+            <span class="field-label">${t('classRewardLabel')}</span>
+            <input type="text" class="text-input" id="ce-reward" maxlength="40" value="${escapeHtml(c.reward)}" placeholder="${escapeHtml(t('defaultReward'))}">
           </label>
         </div>
 
         <div class="field">
-          <span class="field-label">Одна зірка за … тиші</span>
+          <span class="field-label">${t('classSpeedLabel')}</span>
           <div class="liquid-glass-pillbar panel-pillbar" id="ce-speed">
             ${STAR_SPEEDS.map((sec) => `
               <button type="button" class="liquid-glass-tab ${c.secondsPerStar === sec ? 'active' : ''}" data-speed="${sec}">
-                ${sec} с${sec === STAR_SPEEDS[0] ? ' (легко)' : sec === STAR_SPEEDS[STAR_SPEEDS.length - 1] ? ' (важко)' : ''}
+                ${sec} s${sec === STAR_SPEEDS[0] ? t('classSpeedEasy') : sec === STAR_SPEEDS[STAR_SPEEDS.length - 1] ? t('classSpeedHard') : ''}
               </button>
             `).join('')}
           </div>
@@ -466,29 +467,29 @@ export class ClassSidebar {
 
         <div class="jar-now">
           <div class="jar-now-count">${iconStar(true)} <b id="ce-stars">${c.stars}</b> / <span id="ce-goal-label">${c.goal}</span></div>
-          <button type="button" class="chip-btn-gold" id="ce-add-star" title="Клавіша S">+1 зірка</button>
+          <button type="button" class="chip-btn-gold" id="ce-add-star" title="${escapeHtml(t('classAddStarTitle'))}">${t('classAddStarBtn')}</button>
         </div>
 
         <div class="class-stats-strip">
-          <div class="stat-cell"><span class="stat-val" id="ce-total">${c.totalStars || 0}</span><span class="stat-lbl">Усього зірок</span></div>
-          <button type="button" class="stat-cell stat-cell-interactive" id="ce-add-task" title="Зарахувати виконане завдання">
+          <div class="stat-cell"><span class="stat-val" id="ce-total">${c.totalStars || 0}</span><span class="stat-lbl">${t('classStatTotal')}</span></div>
+          <button type="button" class="stat-cell stat-cell-interactive" id="ce-add-task" title="${escapeHtml(t('classStatTasksTitle'))}">
             <span class="stat-val-row"><span class="stat-val" id="ce-tasks">${c.tasksCompleted || 0}</span><span class="stat-plus-badge">+1</span></span>
-            <span class="stat-lbl">Завдань</span>
+            <span class="stat-lbl">${t('classStatTasks')}</span>
           </button>
-          <div class="stat-cell"><span class="stat-val" id="ce-goals">${c.goalsReached || 0}</span><span class="stat-lbl">Призів</span></div>
-          <div class="stat-cell"><span class="stat-val" id="ce-quiet">${Math.floor((c.quietSeconds || 0) / 60)}</span><span class="stat-lbl">Хв тиші</span></div>
+          <div class="stat-cell"><span class="stat-val" id="ce-goals">${c.goalsReached || 0}</span><span class="stat-lbl">${t('classStatGoals')}</span></div>
+          <div class="stat-cell"><span class="stat-val" id="ce-quiet">${Math.floor((c.quietSeconds || 0) / 60)}</span><span class="stat-lbl">${t('classStatQuietMin')}</span></div>
         </div>
 
         <div class="field">
-          <span class="field-label">Отримані призи</span>
+          <span class="field-label">${t('classHistoryLabel')}</span>
           <ul class="prize-history" id="ce-history">${this.renderHistory(c)}</ul>
         </div>
 
         <div class="popover-actions">
-          <button type="button" class="action-btn secondary" id="ce-reset" title="Банка стане порожньою. Загальна статистика залишиться.">
-            ${iconReset()} <span>Нова банка (0 зірок)</span>
+          <button type="button" class="action-btn secondary" id="ce-reset" title="${escapeHtml(t('classResetTitle'))}">
+            ${iconReset()} <span>${t('classResetBtn')}</span>
           </button>
-          ${canDelete ? `<button type="button" class="icon-danger-btn" id="ce-delete" title="Видалити клас">${iconTrash()}</button>` : ''}
+          ${canDelete ? `<button type="button" class="icon-danger-btn" id="ce-delete" title="${escapeHtml(t('classDeleteTitle'))}">${iconTrash()}</button>` : ''}
         </div>
       `,
       onMount: (el) => this.bindEditor(el, name),
@@ -501,13 +502,13 @@ export class ClassSidebar {
   renderHistory(c) {
     const history = c.prizeHistory || [];
     if (history.length === 0) {
-      return '<li class="prize-history-empty">Ще немає. Наберіть ціль — і приз з\'явиться тут.</li>';
+      return `<li class="prize-history-empty">${t('classHistoryEmpty')}</li>`;
     }
     const rows = history.slice(0, HISTORY_PREVIEW).map((p) => `
       <li>${iconGift()}<span>${escapeHtml(p.reward)}</span><time>${formatDate(p.date)}</time></li>
     `).join('');
     const more = history.length > HISTORY_PREVIEW
-      ? `<li class="prize-history-empty">і ще ${history.length - HISTORY_PREVIEW}…</li>`
+      ? `<li class="prize-history-empty">${t('classHistoryMore', { n: history.length - HISTORY_PREVIEW })}</li>`
       : '';
     return rows + more;
   }
@@ -567,7 +568,7 @@ export class ClassSidebar {
     const commitGoal = () => {
       const goal = Math.max(3, Math.min(200, parseInt(inGoal.value, 10) || 20));
       inGoal.value = goal;
-      this.callbacks.onGoalChange(goal, inReward.value.trim() || 'Нагорода');
+      this.callbacks.onGoalChange(goal, inReward.value.trim() || t('rewardFallback'));
       this.render();
       this.refreshEditor();
     };
@@ -584,7 +585,7 @@ export class ClassSidebar {
     el.querySelector('#ce-add-task').addEventListener('click', () => this.callbacks.onAddTask());
     el.querySelector('#ce-reset').addEventListener('click', () => this.callbacks.onResetStars());
     el.querySelector('#ce-delete')?.addEventListener('click', () => {
-      if (window.confirm(`Видалити «${name}» разом зі зірками та статистикою?`)) {
+      if (window.confirm(t('classDeleteConfirm', { name }))) {
         closePopover();
         this.callbacks.onDelete(name);
       }

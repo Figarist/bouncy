@@ -18,6 +18,7 @@
     <link rel="alternate" hreflang="uk" href="https://sivochka.com/bouncy/" />
     <link rel="alternate" hreflang="en" href="https://sivochka.com/bouncy/?lang=en" />
     <link rel="alternate" hreflang="pl" href="https://sivochka.com/bouncy/?lang=pl" />
+    <link rel="alternate" hreflang="ru" href="https://sivochka.com/bouncy/?lang=ru" />
     <meta property="og:title" content="Тихий клас — Шумомір для уроку та таймер тиші" />
     <meta property="og:description" content="Безкоштовний шумомір для класу з адаптивним DSP-фільтром вебкамери, таймером завдань і банкою зірок для вчителів." />
     <meta property="og:type" content="website" />
@@ -50,7 +51,7 @@
             "description": "Безкоштовний інтерактивний шумомір для класу з Web Audio DSP-фільтрацією віддалених вебкамер (2–4 м), таймером завдань та мотиваційною банкою зірок для смарт-дошок, ТВ і шкільних проекторів.",
             "applicationCategory": "EducationalApplication",
             "operatingSystem": "Web, Windows, macOS, Android, iOS, ChromeOS",
-            "inLanguage": ["uk", "en"],
+            "inLanguage": ["uk", "en", "pl", "ru"],
             "isAccessibleForFree": true,
             "featureList": [
               "Web Audio DSP-тракт: фільтр 120 Гц від гулу кулерів та проекторів, акцент мовлення 2.2 кГц та програмний preamp для вебкамер на відстані 2–4 м",
@@ -161,34 +162,34 @@
   </head>
   <body>
     <canvas id="game-canvas"></canvas>
-    <aside class="sr-seo-guide" id="faq" aria-label="Довідка та часті питання про шумомір Тихий клас">
-      <h2>Тихий клас — Довідка, Web Audio DSP та часті питання (FAQ)</h2>
-      <p><strong>Тихий клас (Quiet Class)</strong> — безкоштовний автономний шумомір для класу, таймер завдань і система мотивації класу для вчителів НУШ на інтерактивних дошках, телевізорах і проекторах. Розробник: Ігор Сівочка (Ihor Sivochka / Figarist).</p>
+    <aside class="sr-seo-guide" id="faq" data-i18n-aria="faqAria" aria-label="Довідка та часті питання про шумомір Тихий клас">
+      <h2 data-i18n="faqHeading">Тихий клас — Довідка, Web Audio DSP та часті питання (FAQ)</h2>
+      <p data-i18n-html="faqLead"><strong>Тихий клас (Quiet Class)</strong> — безкоштовний автономний шумомір для класу, таймер завдань і система мотивації класу для вчителів НУШ на інтерактивних дошках, телевізорах і проекторах. Розробник: Ігор Сівочка (Ihor Sivochka / Figarist).</p>
       <details>
-        <summary tabindex="-1">Чому «Тихий клас» точно реагує на шепіт навіть через вебкамеру біля ТВ чи проектора на відстані 2–4 м?</summary>
-        <p>Вбудований Web Audio DSP-конвеєр відсікає низькочастотний гул кулерів ПК та проекторів нижче 120 Гц, підсилює зону мовлення біля 2.2 кГц, використовує програмне підсилення Preamp та калібрує тишу за нижнім процентилем, ігноруючи випадковий стукіт.</p>
+        <summary tabindex="-1" data-i18n="faqQ1">Чому «Тихий клас» точно реагує на шепіт навіть через вебкамеру біля ТВ чи проектора на відстані 2–4 м?</summary>
+        <p data-i18n="faqA1">Вбудований Web Audio DSP-конвеєр відсікає низькочастотний гул кулерів ПК та проекторів нижче 120 Гц, підсилює зону мовлення біля 2.2 кГц, використовує програмне підсилення Preamp та калібрує тишу за нижнім процентилем, ігноруючи випадковий стукіт.</p>
       </details>
       <details>
-        <summary tabindex="-1">Чи записується або передається звук із шкільного мікрофона на сервер?</summary>
-        <p>Ні. Аудіопотік аналізується виключно в реальному часі в оперативній пам'яті браузера і нікуди не записується та не відправляється. Це гарантує повну приватність дітей у класі.</p>
+        <summary tabindex="-1" data-i18n="faqQ2">Чи записується або передається звук із шкільного мікрофона на сервер?</summary>
+        <p data-i18n="faqA2">Ні. Аудіопотік аналізується виключно в реальному часі в оперативній пам'яті браузера і нікуди не записується та не відправляється. Це гарантує повну приватність дітей у класі.</p>
       </details>
       <details>
-        <summary tabindex="-1">Як працюють Банка зірок, таймер завдань і профілі різних класів?</summary>
-        <p>У режимах контролю тиші клас отримує одну золоту зірку за кожні 30 секунд перебування в зеленій зоні. Вчитель може перемикати збережені класи (наприклад, 3-А чи 4-Б), задавати ціль нагороди та запускати вбудований таймер самостійної роботи.</p>
+        <summary tabindex="-1" data-i18n="faqQ3">Як працюють Банка зірок, таймер завдань і профілі різних класів?</summary>
+        <p data-i18n="faqA3">У режимах контролю тиші клас отримує одну золоту зірку за кожні 30 секунд перебування в зеленій зоні. Вчитель може перемикати збережені класи (наприклад, 3-А чи 4-Б), задавати ціль нагороди та запускати вбудований таймер самостійної роботи.</p>
       </details>
       <details>
-        <summary tabindex="-1">Чи можна встановити «Тихий клас» на шкільний комп'ютер і користуватися без інтернету?</summary>
-        <p>Так. Додаток зібраний як Progressive Web App (PWA) із локальними шрифтами та Service Worker, тому після першого відкриття працює навіть у разі зникнення Wi-Fi у школі.</p>
+        <summary tabindex="-1" data-i18n="faqQ4">Чи можна встановити «Тихий клас» на шкільний комп'ютер і користуватися без інтернету?</summary>
+        <p data-i18n="faqA4">Так. Додаток зібраний як Progressive Web App (PWA) із локальними шрифтами та Service Worker, тому після першого відкриття працює навіть у разі зникнення Wi-Fi у школі.</p>
       </details>
       <details>
-        <summary tabindex="-1">Хто розробив інструмент?</summary>
-        <p>Шумомір «Тихий клас» створив Ігор Сівочка (Figarist).</p>
+        <summary tabindex="-1" data-i18n="faqQ5">Хто розробив інструмент?</summary>
+        <p data-i18n="faqA5">Шумомір «Тихий клас» створив Ігор Сівочка (Figarist).</p>
       </details>
       <details>
-        <summary tabindex="-1">Classroom Noise Meter &amp; Miernik hałasu w klasie (GDPR / Privacy)</summary>
-        <p>Quiet Class (Тихий клас) is a 100% free browser-based classroom noise meter and silent-work timer. All microphone audio is processed locally via Web Audio API DSP—zero audio is ever recorded or uploaded (GDPR-safe for EU, UK, US, and Polish schools).</p>
+        <summary tabindex="-1" data-i18n="faqQ6">Classroom Noise Meter &amp; Miernik hałasu w klasie (GDPR / Privacy)</summary>
+        <p data-i18n="faqA6">Quiet Class (Тихий клас) is a 100% free browser-based classroom noise meter and silent-work timer. All microphone audio is processed locally via Web Audio API DSP—zero audio is ever recorded or uploaded (GDPR-safe for EU, UK, US, and Polish schools).</p>
       </details>
-      <nav aria-label="Посилання">
+      <nav data-i18n-aria="faqNavAria" aria-label="Посилання">
         <a href="https://sivochka.com/" tabindex="-1">sivochka.com</a>
         <a href="https://github.com/Figarist/bouncy" tabindex="-1">GitHub</a>
         <a href="https://github.com/Figarist/friendly-arcade" tabindex="-1">Friendly Arcade UI</a>

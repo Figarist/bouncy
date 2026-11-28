@@ -1,11 +1,4 @@
-const DEFAULT_TITLE = 'Тихий клас — Шумомір для уроку та таймер тиші | Ігор Сівочка';
-const SHORT_BRAND = 'Тихий клас';
-
-const ZONE_TITLES = {
-  green: 'Тихо',
-  yellow: 'Шепіт',
-  red: 'Шумно!',
-};
+import { t } from './i18n.js';
 
 const ZONE_COLORS = {
   green: '#22C55E',
@@ -13,6 +6,12 @@ const ZONE_COLORS = {
   red: '#EF4444',
   paused: '#94A3B8',
 };
+
+function zoneTitle(zone) {
+  if (zone === 'red') return t('zoneRed');
+  if (zone === 'yellow') return t('zoneYellow');
+  return t('zoneGreen');
+}
 
 /**
  * Formats seconds as MM:SS, rounding up so 00:00 never shows while time remains.
@@ -45,10 +44,11 @@ export function formatBackgroundTitle({
   isListening = false,
   isSimulated = false,
   isPaused = false,
-  baseTitle = DEFAULT_TITLE,
+  baseTitle = t('docTitle'),
 }) {
+  const shortBrand = t('shortBrand');
   if (isPaused) {
-    return `Пауза — ${SHORT_BRAND}`;
+    return `${t('tabPaused')} — ${shortBrand}`;
   }
 
   const hasSignal = Boolean(isListening || isSimulated);
@@ -58,14 +58,14 @@ export function formatBackgroundTitle({
 
   const parts = [];
   if (hasSignal) {
-    parts.push(ZONE_TITLES[zone] || ZONE_TITLES.green);
+    parts.push(zoneTitle(zone));
   }
   if (timerRunning && remainingSeconds > 0) {
     parts.push(formatTimerText(remainingSeconds));
   }
 
   if (parts.length === 0) return baseTitle;
-  return `${parts.join(' · ')} — ${SHORT_BRAND}`;
+  return `${parts.join(' · ')} — ${shortBrand}`;
 }
 
 /**
@@ -86,12 +86,17 @@ export function resolveFaviconState({ zone, isListening, isSimulated, isPaused }
  */
 export class TabIndicator {
   constructor() {
-    this.baseTitle = typeof document !== 'undefined' ? document.title || DEFAULT_TITLE : DEFAULT_TITLE;
+    this.baseTitle = typeof document !== 'undefined' ? document.title || t('docTitle') : t('docTitle');
     this.iconEl = typeof document !== 'undefined' ? document.querySelector('link[rel~="icon"]') : null;
     this.baseIconHref = this.iconEl?.getAttribute('href') || './icon.svg';
     this.lastTitle = this.baseTitle;
     this.lastFaviconKey = null;
     this.iconCache = new Map();
+  }
+
+  refreshBaseTitle() {
+    this.baseTitle = typeof document !== 'undefined' ? document.title || t('docTitle') : t('docTitle');
+    this.lastTitle = this.baseTitle;
   }
 
   /**
